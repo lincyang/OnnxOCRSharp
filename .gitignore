@@ -1,0 +1,105 @@
+# =========================
+# Build output
+# =========================
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+[Oo]ut/
+artifacts/
+publish/
+
+# =========================
+# .NET
+# =========================
+project.lock.json
+project.fragment.lock.json
+*.nuget.props
+*.nuget.targets
+*.cache
+*.dll.config
+*.exe.config
+
+# =========================
+# Visual Studio / VS Code
+# =========================
+.vs/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json.example
+*.rsuser
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.userprefs
+
+# Visual Studio profiler / test / coverage
+*.psess
+*.vsp
+*.vspx
+*.sap
+*.dotCover
+*.coverage
+*.coveragexml
+coverage*.json
+coverage*.xml
+TestResult*/
+[Tt]est[Rr]esult*/
+[Bb]uild[Ll]og.*
+*.VisualState.xml
+
+# ReSharper / Rider
+_ReSharper*/
+*.[Rr]e[Ss]harper
+*.DotSettings.user
+.idea/
+*.sln.iml
+
+# =========================
+# NuGet
+# =========================
+*.nupkg
+*.snupkg
+**/[Pp]ackages/*
+!**/[Pp]ackages/build/
+*.nuget.cache
+
+# =========================
+# ONNX / OCR 本地模型（模型复用 sibling OnnxOCR，勿提交大文件）
+# =========================
+# models/
+# *.onnx
+!**/docs/**/*.onnx
+
+# =========================
+# 用户数据 / 临时文件
+# =========================
+*.tmp
+*.temp
+*.bak
+*.swp
+*~
+~$*
+
+# OCR 运行输出
+output/
+results/
+uploads/
+
+# =========================
+# OS
+# =========================
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+.template.config

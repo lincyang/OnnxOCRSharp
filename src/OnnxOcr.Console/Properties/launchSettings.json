@@ -1,0 +1,9 @@
+{
+  "profiles": {
+    "OnnxOcr.Console": {
+      "commandName": "Project",
+      "commandLineArgs": "test_assets/pic002.png",
+      "workingDirectory": "../.."
+    }
+  }
+}

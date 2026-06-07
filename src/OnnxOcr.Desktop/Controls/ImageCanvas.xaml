@@ -1,0 +1,47 @@
+<UserControl x:Class="OnnxOcr.Desktop.Controls.ImageCanvas"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:OnnxOcr.Desktop.ViewModels"
+             Background="#1E1E1E">
+    <ScrollViewer x:Name="ScrollHost"
+                  HorizontalScrollBarVisibility="Auto"
+                  VerticalScrollBarVisibility="Auto"
+                  PreviewMouseWheel="ScrollHost_OnPreviewMouseWheel">
+        <!-- 单一 Canvas，尺寸与图片像素 1:1，检测框坐标直接对应 -->
+        <Canvas x:Name="RootCanvas">
+            <Image x:Name="ImageHost"
+                   Canvas.Left="0"
+                   Canvas.Top="0"
+                   Stretch="Fill"
+                   RenderOptions.BitmapScalingMode="HighQuality" />
+
+            <ItemsControl x:Name="OverlayItems"
+                          Canvas.Left="0"
+                          Canvas.Top="0"
+                          IsHitTestVisible="False"
+                          ItemsSource="{Binding Lines, RelativeSource={RelativeSource AncestorType=UserControl}}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <Canvas />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemContainerStyle>
+                    <Style TargetType="ContentPresenter">
+                        <Setter Property="Canvas.Left" Value="0" />
+                        <Setter Property="Canvas.Top" Value="0" />
+                    </Style>
+                </ItemsControl.ItemContainerStyle>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="{x:Type vm:OcrLineViewModel}">
+                        <Polygon Points="{Binding Points}"
+                                 Stroke="{Binding StrokeBrush}"
+                                 StrokeThickness="{Binding StrokeThickness}"
+                                 Fill="#30FFFFFF"
+                                 RenderTransformOrigin="0,0"
+                                 IsHitTestVisible="False" />
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </Canvas>
+    </ScrollViewer>
+</UserControl>
