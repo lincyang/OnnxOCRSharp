@@ -19,6 +19,11 @@ public sealed class OcrService : IDisposable
 {
     private readonly TextSystem _textSystem;
 
+    public OcrService(OcrModelPreset preset, string? modelsRoot = null)
+        : this(OcrOptions.ForPreset(preset, modelsRoot))
+    {
+    }
+
     public OcrService(OcrOptions? options = null)
     {
         _textSystem = new TextSystem(options ?? OcrOptions.CreateDefault());

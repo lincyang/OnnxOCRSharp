@@ -18,6 +18,11 @@ OnnxOCRSharp/
 │   │   ├── rec/
 │   │   │   └── rec.onnx
 │   │   └── ppocrv5_dict.txt
+│   ├── ppocrv6/
+│   │   ├── PP-OCRv6_tiny_det_onnx/inference.onnx
+│   │   ├── PP-OCRv6_tiny_rec_onnx/inference.onnx
+│   │   ├── ppocrv6_tiny_dict.txt
+│   │   └── ppocrv6_dict.txt
 │   └── orientation/
 │       └── rapid_orientation.onnx
 ├── src/
@@ -55,22 +60,79 @@ OnnxOCRSharp/
 # 编译
 dotnet build
 
-# 识别图片
+# 识别图片（默认 PP-OCRv5）
 dotnet run --project src/OnnxOcr.Console -- test_assets/sample.jpg
+
+# 使用 PP-OCRv6 tiny
+dotnet run --project src/OnnxOcr.Console -- --preset v6 test_assets/sample.jpg
 ```
 
+## 库调用示例
+
+```csharp
+using OnnxOcr.Core.Configuration;
+using OnnxOcr.Core.Pipeline;
+using OpenCvSharp;
+
+// PP-OCRv6 tiny（模型放在 models/ppocrv6/，自动解析路径）
+var options = OcrOptions.ForPpOcrV6Tiny();
+using var ocr = new TextSystem(options);
+
+using var image = Cv2.ImRead("test.jpg");
+var result = ocr.Run(image);
+
+// NuGet 引用方指定 models 根目录
+var options2 = OcrOptions.ForPpOcrV6Tiny(@"D:\myapp\models");
+```
+
+```csharp
+using OnnxOcr.App.Services;
+using OnnxOcr.Core.Configuration;
+
+using var service = new OcrService(OcrModelPreset.PpOcrV6Tiny);
+var result = await service.RecognizeAsync("test.jpg");
+```
 
 ## 模型路径
 
-默认自动查找（优先级）：
+### PP-OCRv5（默认）
 
-1. `models/ppocrv5/`
+自动查找 `models/ppocrv5/`：
 
 ```
 models/ppocrv5/
 ├── det/det.onnx
 ├── rec/rec.onnx
 └── ppocrv5_dict.txt
+```
+
+### PP-OCRv6 tiny
+
+自动查找 `models/ppocrv6/`，兼容魔塔 / ModelScope 原样解压目录：
+
+```
+models/ppocrv6/
+├── PP-OCRv6_tiny_det_onnx/inference.onnx
+├── PP-OCRv6_tiny_rec_onnx/inference.onnx
+└── ppocrv6_tiny_dict.txt
+```
+
+**国内下载（魔塔 ModelScope）：**
+
+- `PaddlePaddle/PP-OCRv6_tiny_det_onnx`
+- `PaddlePaddle/PP-OCRv6_tiny_rec_onnx`
+
+解压到 `models/ppocrv6/` 即可。字典文件 `ppocrv6_tiny_dict.txt` 已随仓库提供（也可运行 `python tools/export_ppocrv6_dict.py` 从 rec 的 `inference.yml` 重新导出；**注意不要用 `.strip()` 处理字典字符，全角空格 `　` 必须保留**）。
+
+### PP-OCRv6 small / medium
+
+small 与 medium 共用统一字典 `ppocrv6_dict.txt`（约 18708 字符，含日文）；**tiny 使用较小的 `ppocrv6_tiny_dict.txt`（约 6904 字符，不含日文）**，请勿混用。
+
+```
+models/ppocrv6/
+├── PP-OCRv6_small_det_onnx/inference.onnx
+├── PP-OCRv6_small_rec_onnx/inference.onnx
+└── ppocrv6_dict.txt
 ```
 
 ## 开源许可证

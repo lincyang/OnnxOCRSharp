@@ -1,17 +1,19 @@
 //-----------------------------------------------------------------------
-// <copyright file="OcrOptions.cs" company="����ԱLinc">
-// Copyright (c) ����ԱLinc. All rights reserved.
+// <copyright file="OcrOptions.cs" company="???Linc">
+// Copyright (c) ???Linc. All rights reserved.
 // </copyright>
-// <author>����ԱLinc</author>
+// <author>???Linc</author>
 // <website>
 // https://github.com/lincyang/OnnxOCRSharp
 // </website>
-// <wechat>���ںţ�����ԱLinc</wechat>
+// <wechat>???????Linc</wechat>
 //-----------------------------------------------------------------------
 namespace OnnxOcr.Core.Configuration;
 
 public sealed class OcrOptions
 {
+    public OcrModelPreset? ModelPreset { get; set; }
+
     public string DetModelPath { get; set; } = "";
     public string RecModelPath { get; set; } = "";
     public string DictPath { get; set; } = "";
@@ -28,6 +30,7 @@ public sealed class OcrOptions
     public float DetDbThresh { get; set; } = 0.3f;
     public float DetDbBoxThresh { get; set; } = 0.6f;
     public float DetDbUnclipRatio { get; set; } = 1.5f;
+    public int DetDbMaxCandidates { get; set; } = 1000;
     public bool UseDilation { get; set; }
     public string DetDbScoreMode { get; set; } = "fast";
 
@@ -39,85 +42,52 @@ public sealed class OcrOptions
 
     public bool UseAngleCls { get; set; }
 
-    public static OcrOptions CreateDefault()
+    public static OcrOptions CreateDefault() => ForPreset(OcrModelPreset.PpOcrV5);
+
+    public static OcrOptions ForPreset(OcrModelPreset preset, string? modelsRoot = null)
     {
-        var modelsRoot = PathResolver.FindPpOcrV5ModelsRoot();
-        return new OcrOptions
-        {
-            DetModelPath = Path.Combine(modelsRoot, "det", "det.onnx"),
-            RecModelPath = Path.Combine(modelsRoot, "rec", "rec.onnx"),
-            DictPath = Path.Combine(modelsRoot, "ppocrv5_dict.txt"),
-            OrientationModelPath = PathResolver.FindOrientationModelPath(),
-        };
+        var options = new OcrOptions();
+        OcrModelProfiles.Apply(options, preset, modelsRoot);
+        return options;
     }
+
+    public static OcrOptions ForPpOcrV5(string? modelsRoot = null)
+        => ForPreset(OcrModelPreset.PpOcrV5, modelsRoot);
+
+    public static OcrOptions ForPpOcrV6Tiny(string? modelsRoot = null)
+        => ForPreset(OcrModelPreset.PpOcrV6Tiny, modelsRoot);
+
+    public static OcrOptions ForPpOcrV6Small(string? modelsRoot = null)
+        => ForPreset(OcrModelPreset.PpOcrV6Small, modelsRoot);
+
+    public static OcrOptions ForPpOcrV6Medium(string? modelsRoot = null)
+        => ForPreset(OcrModelPreset.PpOcrV6Medium, modelsRoot);
 
     public void Validate()
     {
         if (!File.Exists(DetModelPath))
-            throw new FileNotFoundException($"Detection model not found: {DetModelPath}");
+            throw new FileNotFoundException(BuildMissingFileMessage("Detection model", DetModelPath));
+
         if (!File.Exists(RecModelPath))
-            throw new FileNotFoundException($"Recognition model not found: {RecModelPath}");
+            throw new FileNotFoundException(BuildMissingFileMessage("Recognition model", RecModelPath));
+
         if (!File.Exists(DictPath))
-            throw new FileNotFoundException($"Dictionary not found: {DictPath}");
-    }
-}
-
-internal static class PathResolver
-{
-    public static string FindPpOcrV5ModelsRoot()
-    {
-        foreach (var root in EnumerateSearchRoots())
-        {
-            // 优先�?OnnxOCRSharp 目录下查�?            var candidateInProject = Path.Combine(root, "models", "ppocrv5");
-            if (Directory.Exists(candidateInProject))
-                return candidateInProject;
-            
-            // 然后在同级目录的 OnnxOCR 中查找（保持兼容性）
-            var candidateInSibling = Path.Combine(root, "OnnxOCR", "onnxocr", "models", "ppocrv5");
-            if (Directory.Exists(candidateInSibling))
-                return candidateInSibling;
-        }
-
-        throw new DirectoryNotFoundException(
-            "Could not locate models/ppocrv5 or OnnxOCR/onnxocr/models/ppocrv5. " +
-            "Place models in OnnxOCRSharp/models/ directory or set model paths manually.");
+            throw new FileNotFoundException(BuildMissingFileMessage("Dictionary", DictPath));
     }
 
-    public static string FindOrientationModelPath()
+    private string BuildMissingFileMessage(string kind, string path)
     {
-        foreach (var root in EnumerateSearchRoots())
+        var presetHint = ModelPreset switch
         {
-            // 优先�?OnnxOCRSharp 目录下查�?            var candidateInProject = Path.Combine(root, "models", "orientation", "rapid_orientation.onnx");
-            if (File.Exists(candidateInProject))
-                return candidateInProject;
-            
-            // 然后在同级目录的 OnnxOCR 中查找（保持兼容性）
-            var candidateInSibling = Path.Combine(root, "OnnxOCR", "onnxocr", "models", "orientation", "rapid_orientation.onnx");
-            if (File.Exists(candidateInSibling))
-                return candidateInSibling;
-        }
+            OcrModelPreset.PpOcrV6Tiny =>
+                "Download PP-OCRv6 tiny det/rec from ModelScope and place ppocrv6_tiny_dict.txt under models/ppocrv6/.",
+            OcrModelPreset.PpOcrV6Small or OcrModelPreset.PpOcrV6Medium =>
+                "Download PP-OCRv6 small/medium det/rec from ModelScope and place ppocrv6_dict.txt under models/ppocrv6/.",
+            OcrModelPreset.PpOcrV5 =>
+                "Place PP-OCRv5 models under models/ppocrv5/ or call OcrOptions.ForPpOcrV5(modelsRoot).",
+            _ => "Configure model paths manually or use OcrOptions.ForPreset(...).",
+        };
 
-        return "";
-    }
-
-    private static IEnumerable<string> EnumerateSearchRoots()
-    {
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-        foreach (var path in WalkUp(AppContext.BaseDirectory).Concat(WalkUp(Directory.GetCurrentDirectory())))
-        {
-            if (seen.Add(path))
-                yield return path;
-        }
-    }
-
-    private static IEnumerable<string> WalkUp(string startPath)
-    {
-        var current = new DirectoryInfo(startPath);
-        while (current != null)
-        {
-            yield return current.FullName;
-            current = current.Parent;
-        }
+        return $"{kind} not found: {path}{Environment.NewLine}{presetHint}";
     }
 }

@@ -30,7 +30,7 @@ public sealed class TextDetector : IDisposable
         _postProcess = new DbPostProcess(
             thresh: options.DetDbThresh,
             boxThresh: options.DetDbBoxThresh,
-            maxCandidates: 1000,
+            maxCandidates: options.DetDbMaxCandidates,
             unclipRatio: options.DetDbUnclipRatio,
             useDilation: options.UseDilation,
             scoreMode: options.DetDbScoreMode,

@@ -8,6 +8,8 @@
 // </website>
 // <wechat>公众号：程序员Linc</wechat>
 //-----------------------------------------------------------------------
+using System.Text;
+
 namespace OnnxOcr.Core.Recognition;
 
 public sealed class CtcLabelDecode
@@ -18,12 +20,8 @@ public sealed class CtcLabelDecode
     {
         _characters = ["blank"];
 
-        foreach (var line in File.ReadLines(dictionaryPath))
-        {
-            var text = line.Trim('\r', '\n');
-            if (text.Length > 0)
-                _characters.Add(text);
-        }
+        foreach (var line in File.ReadLines(dictionaryPath, Encoding.UTF8))
+            _characters.Add(line.TrimEnd('\r', '\n'));
 
         if (useSpaceChar)
             _characters.Add(" ");
