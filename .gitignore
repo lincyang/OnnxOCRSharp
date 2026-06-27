@@ -68,7 +68,7 @@ _ReSharper*/
 # =========================
 # ONNX / OCR 本地模型（模型复用 sibling OnnxOCR，勿提交大文件）
 # =========================
-# models/
+models/
 # *.onnx
 !**/docs/**/*.onnx
 

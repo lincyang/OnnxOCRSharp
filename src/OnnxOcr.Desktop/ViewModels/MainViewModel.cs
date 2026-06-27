@@ -1,14 +1,15 @@
 //-----------------------------------------------------------------------
-// <copyright file="MainViewModel.cs" company="����ԱLinc">
-// Copyright (c) ����ԱLinc. All rights reserved.
+// <copyright file="MainViewModel.cs" company="程序员Linc">
+// Copyright (c) 程序员Linc. All rights reserved.
 // </copyright>
-// <author>����ԱLinc</author>
+// <author>程序员Linc</author>
 // <website>
 // https://github.com/lincyang/OnnxOCRSharp
 // </website>
-// <wechat>���ںţ�����ԱLinc</wechat>
+// <wechat>公众号：程序员Linc</wechat>
 //-----------------------------------------------------------------------
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Windows;
 using System.Windows.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -16,6 +17,7 @@ using CommunityToolkit.Mvvm.Input;
 using Microsoft.Win32;
 using OnnxOcr.App.Models;
 using OnnxOcr.App.Services;
+using OnnxOcr.Core;
 using OnnxOcr.Core.Configuration;
 using OnnxOcr.Desktop.Helpers;
 using OpenCvSharp;
@@ -75,6 +77,21 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
     [ObservableProperty]
     private string _elapsedText = "耗时: -";
 
+    [ObservableProperty]
+    private bool _isDownloading;
+
+    [ObservableProperty]
+    private double _downloadProgress;
+
+    [ObservableProperty]
+    private string _downloadStatus = "";
+
+    [ObservableProperty]
+    private bool _needsDownload;
+
+    [ObservableProperty]
+    private string _downloadErrorMessage = "";
+
     public ObservableCollection<OcrLineViewModel> Lines { get; } = new();
 
     public async Task InitializeAsync()
@@ -98,10 +115,23 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
         try
         {
             _recognizeCts?.Cancel();
+            NeedsDownload = false;
+            DownloadErrorMessage = "";
 
             IsBusy = true;
             IsReady = false;
-            StatusMessage = $"正在加载模型 ({PresetOptions.First(p => p.Preset == preset).DisplayName})...";
+            var presetName = PresetOptions.First(p => p.Preset == preset).DisplayName;
+            StatusMessage = $"正在加载模型 ({presetName})...";
+
+            if (IsV6Preset(preset) && !CheckV6ModelExists(preset))
+            {
+                NeedsDownload = true;
+                DownloadErrorMessage = $"PP-OCRv6 模型文件未找到，请从魔塔下载后使用。";
+                StatusMessage = "模型文件未找到";
+                IsBusy = false;
+                RefreshCommands();
+                return;
+            }
 
             token.ThrowIfCancellationRequested();
 
@@ -121,15 +151,153 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
         }
         catch (Exception ex)
         {
-            StatusMessage = $"模型加载失败: {ex.Message}";
-            IsReady = false;
-            MessageBox.Show(ex.Message, "模型加载失败", MessageBoxButton.OK, MessageBoxImage.Error);
+            if (IsModelNotFoundException(ex) && IsV6Preset(preset))
+            {
+                NeedsDownload = true;
+                DownloadErrorMessage = ex.Message;
+                StatusMessage = "模型文件未找到";
+                IsReady = false;
+            }
+            else
+            {
+                StatusMessage = $"模型加载失败: {ex.Message}";
+                IsReady = false;
+                MessageBox.Show(ex.Message, "模型加载失败", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
         finally
         {
             IsBusy = false;
             RefreshCommands();
         }
+    }
+
+    private static bool CheckV6ModelExists(OcrModelPreset preset)
+    {
+        var tier = preset switch
+        {
+            OcrModelPreset.PpOcrV6Tiny => "tiny",
+            OcrModelPreset.PpOcrV6Small => "small",
+            OcrModelPreset.PpOcrV6Medium => "medium",
+            _ => ""
+        };
+        if (string.IsNullOrEmpty(tier))
+            return false;
+
+        var searchRoot = AppContext.BaseDirectory;
+        for (var dir = new DirectoryInfo(searchRoot); dir != null; dir = dir.Parent)
+        {
+            var v6Root = Path.Combine(dir.FullName, "models", "ppocrv6");
+            if (!Directory.Exists(v6Root))
+                continue;
+
+            var detCandidates = new[]
+            {
+                Path.Combine(v6Root, $"PP-OCRv6_{tier}_det_onnx", "inference.onnx"),
+                Path.Combine(v6Root, tier, "det", "inference.onnx"),
+                Path.Combine(v6Root, tier, "det", "det.onnx"),
+            };
+            var recCandidates = new[]
+            {
+                Path.Combine(v6Root, $"PP-OCRv6_{tier}_rec_onnx", "inference.onnx"),
+                Path.Combine(v6Root, tier, "rec", "inference.onnx"),
+                Path.Combine(v6Root, tier, "rec", "rec.onnx"),
+            };
+
+            var detFound = detCandidates.Any(File.Exists);
+            var recFound = recCandidates.Any(File.Exists);
+            if (detFound && recFound)
+                return true;
+        }
+
+        return false;
+    }
+
+    private static bool IsModelNotFoundException(Exception ex)
+    {
+        return ex is FileNotFoundException or DirectoryNotFoundException;
+    }
+
+    private static bool IsV6Preset(OcrModelPreset preset)
+    {
+        return preset is OcrModelPreset.PpOcrV6Tiny
+            or OcrModelPreset.PpOcrV6Small
+            or OcrModelPreset.PpOcrV6Medium;
+    }
+
+    [RelayCommand(CanExecute = nameof(CanDownload))]
+    private async Task DownloadModelAsync()
+    {
+        var preset = SelectedPreset;
+        _loadModelCts?.Cancel();
+        _loadModelCts = new CancellationTokenSource();
+        var token = _loadModelCts.Token;
+
+        try
+        {
+            IsDownloading = true;
+            IsBusy = true;
+            NeedsDownload = false;
+            DownloadProgress = 0;
+            DownloadStatus = "准备下载...";
+            RefreshCommands();
+
+            var targetDir = preset switch
+            {
+                OcrModelPreset.PpOcrV6Tiny or OcrModelPreset.PpOcrV6Small or OcrModelPreset.PpOcrV6Medium
+                    => FindV6TargetDir(),
+                _ => Path.Combine(FindModelsRoot(), preset.ToString().Replace("PpOcr", "").ToLowerInvariant())
+            };
+
+            using var downloader = new ModelDownloadService();
+            downloader.StatusChanged += status => DownloadStatus = status;
+            downloader.ProgressChanged += progress => DownloadProgress = progress * 100;
+
+            await downloader.DownloadPresetModelsAsync(preset, targetDir, token);
+
+            DownloadStatus = "下载完成，正在加载模型...";
+            await LoadModelAsync(preset);
+        }
+        catch (OperationCanceledException)
+        {
+            StatusMessage = "已取消";
+            NeedsDownload = true;
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"下载失败: {ex.Message}";
+            DownloadStatus = "";
+            NeedsDownload = true;
+            MessageBox.Show(ex.Message, "下载失败", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally
+        {
+            IsDownloading = false;
+            IsBusy = false;
+            RefreshCommands();
+        }
+    }
+
+    private bool CanDownload() => !IsBusy && !IsDownloading;
+
+    private string FindModelsRoot()
+    {
+        var searchRoot = AppContext.BaseDirectory;
+        for (var dir = new DirectoryInfo(searchRoot); dir != null; dir = dir.Parent)
+        {
+            var candidate = Path.Combine(dir.FullName, "models");
+            if (Directory.Exists(candidate))
+                return candidate;
+        }
+        return Path.Combine(AppContext.BaseDirectory, "models");
+    }
+
+    private string FindV6TargetDir()
+    {
+        var modelsRoot = FindModelsRoot();
+        var v6Dir = Path.Combine(modelsRoot, "ppocrv6");
+        Directory.CreateDirectory(v6Dir);
+        return v6Dir;
     }
 
     partial void OnSelectedPresetChanged(OcrModelPreset value)
@@ -220,6 +388,42 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
         StatusMessage = "已复制到剪贴板";
     }
 
+    [RelayCommand]
+    private void CancelOperation()
+    {
+        _loadModelCts?.Cancel();
+        _recognizeCts?.Cancel();
+
+        IsDownloading = false;
+        NeedsDownload = false;
+        DownloadErrorMessage = "";
+        DownloadProgress = 0;
+        DownloadStatus = "";
+        IsBusy = false;
+
+        if (_ocrService != null)
+        {
+            IsReady = true;
+            StatusMessage = "就绪";
+        }
+        else
+        {
+            IsReady = false;
+        }
+    }
+
+    [RelayCommand]
+    private void DismissDownloadPrompt()
+    {
+        NeedsDownload = false;
+        DownloadErrorMessage = "";
+        if (_ocrService != null)
+        {
+            IsReady = true;
+            StatusMessage = "就绪";
+        }
+    }
+
     [RelayCommand(CanExecute = nameof(CanRecognize))]
     private void CancelRecognize()
     {
@@ -273,7 +477,9 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
         RecognizeCommand.NotifyCanExecuteChanged();
         CopyAllCommand.NotifyCanExecuteChanged();
         CancelRecognizeCommand.NotifyCanExecuteChanged();
+        CancelOperationCommand.NotifyCanExecuteChanged();
         ClearCommand.NotifyCanExecuteChanged();
+        DownloadModelCommand.NotifyCanExecuteChanged();
     }
 
     public async ValueTask DisposeAsync()

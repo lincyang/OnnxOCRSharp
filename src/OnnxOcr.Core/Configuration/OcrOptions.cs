@@ -1,12 +1,12 @@
 //-----------------------------------------------------------------------
-// <copyright file="OcrOptions.cs" company="???Linc">
-// Copyright (c) ???Linc. All rights reserved.
+// <copyright file="OcrOptions.cs" company="程序员Linc">
+// Copyright (c) 程序员Linc. All rights reserved.
 // </copyright>
-// <author>???Linc</author>
+// <author>程序员Linc</author>
 // <website>
 // https://github.com/lincyang/OnnxOCRSharp
 // </website>
-// <wechat>???????Linc</wechat>
+// <wechat>公众号：程序员Linc</wechat>
 //-----------------------------------------------------------------------
 namespace OnnxOcr.Core.Configuration;
 

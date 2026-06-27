@@ -46,7 +46,7 @@
                             Width="72"
                             Height="32"
                             Margin="0,0,8,0"
-                            Command="{Binding CancelRecognizeCommand}" />
+                            Command="{Binding CancelOperationCommand}" />
                     <Button Content="复制全部"
                             Width="96"
                             Height="32"
@@ -160,12 +160,13 @@
                 <Style TargetType="Border">
                     <Setter Property="Visibility" Value="Collapsed" />
                     <Style.Triggers>
-                        <DataTrigger Binding="{Binding IsBusy}" Value="True">
+                        <MultiDataTrigger>
+                            <MultiDataTrigger.Conditions>
+                                <Condition Binding="{Binding IsBusy}" Value="True" />
+                                <Condition Binding="{Binding NeedsDownload}" Value="False" />
+                            </MultiDataTrigger.Conditions>
                             <Setter Property="Visibility" Value="Visible" />
-                        </DataTrigger>
-                        <DataTrigger Binding="{Binding IsReady}" Value="False">
-                            <Setter Property="Visibility" Value="Visible" />
-                        </DataTrigger>
+                        </MultiDataTrigger>
                     </Style.Triggers>
                 </Style>
             </Border.Style>
@@ -176,6 +177,106 @@
                            HorizontalAlignment="Center"
                            Margin="0,12,0,0" />
             </StackPanel>
+        </Border>
+
+        <!-- Download overlay -->
+        <Border Grid.RowSpan="3"
+                Background="#80000000">
+            <Border.Style>
+                <Style TargetType="Border">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsDownloading}" Value="True">
+                            <Setter Property="Visibility" Value="Visible" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
+            <Border Background="White"
+                    CornerRadius="8"
+                    Padding="32,24"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    MinWidth="360">
+                <StackPanel>
+                    <TextBlock Text="正在下载模型"
+                               FontSize="16"
+                               FontWeight="SemiBold"
+                               HorizontalAlignment="Center"
+                               Margin="0,0,0,16" />
+                    <ProgressBar Value="{Binding DownloadProgress}"
+                                 Maximum="100"
+                                 Width="320"
+                                 Height="8" />
+                    <TextBlock Text="{Binding DownloadStatus}"
+                               Foreground="#666666"
+                               FontSize="12"
+                               HorizontalAlignment="Center"
+                               Margin="0,8,0,16"
+                               TextWrapping="Wrap"
+                               MaxWidth="320" />
+                    <Button Content="取消"
+                            Width="80"
+                            Height="28"
+                            HorizontalAlignment="Center"
+                            Command="{Binding CancelOperationCommand}" />
+                </StackPanel>
+            </Border>
+        </Border>
+
+        <!-- Download prompt overlay -->
+        <Border Grid.RowSpan="3"
+                Background="#80000000">
+            <Border.Style>
+                <Style TargetType="Border">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding NeedsDownload}" Value="True">
+                            <Setter Property="Visibility" Value="Visible" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
+            <Border Background="White"
+                    CornerRadius="8"
+                    Padding="32,24"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    MinWidth="380">
+                <StackPanel>
+                    <TextBlock Text="模型文件未找到"
+                               FontSize="16"
+                               FontWeight="SemiBold"
+                               HorizontalAlignment="Center"
+                               Margin="0,0,0,8" />
+                    <TextBlock Text="当前选择的模型尚未下载，是否从魔塔(ModelScope)下载？"
+                               Foreground="#666666"
+                               FontSize="13"
+                               TextWrapping="Wrap"
+                               TextAlignment="Center"
+                               Margin="0,0,0,4"
+                               MaxWidth="340" />
+                    <TextBlock Text="{Binding DownloadErrorMessage}"
+                               Foreground="#999999"
+                               FontSize="11"
+                               TextWrapping="Wrap"
+                               Margin="0,0,0,16"
+                               MaxWidth="340" />
+                    <StackPanel Orientation="Horizontal"
+                                HorizontalAlignment="Center">
+                        <Button Content="从魔塔下载"
+                                Width="110"
+                                Height="32"
+                                Margin="0,0,12,0"
+                                Command="{Binding DownloadModelCommand}" />
+                        <Button Content="取消"
+                                Width="80"
+                                Height="32"
+                                IsCancel="True"
+                                Command="{Binding DismissDownloadPromptCommand}" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
         </Border>
     </Grid>
 </Window>
