@@ -196,6 +196,20 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
         }
     }
 
+    [RelayCommand(CanExecute = nameof(CanClear))]
+    private void Clear()
+    {
+        PreviewImage = null;
+        ImagePath = null;
+        Lines.Clear();
+        SelectedLine = null;
+        ElapsedText = "耗时: -";
+        StatusMessage = "就绪";
+        RefreshCommands();
+    }
+
+    private bool CanClear() => !IsBusy;
+
     [RelayCommand(CanExecute = nameof(CanCopyAll))]
     private void CopyAll()
     {
@@ -259,6 +273,7 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
         RecognizeCommand.NotifyCanExecuteChanged();
         CopyAllCommand.NotifyCanExecuteChanged();
         CancelRecognizeCommand.NotifyCanExecuteChanged();
+        ClearCommand.NotifyCanExecuteChanged();
     }
 
     public async ValueTask DisposeAsync()
