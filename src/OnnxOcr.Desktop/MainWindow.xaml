@@ -1,4 +1,4 @@
-﻿<Window x:Class="OnnxOcr.Desktop.MainWindow"
+<Window x:Class="OnnxOcr.Desktop.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:controls="clr-namespace:OnnxOcr.Desktop.Controls"
@@ -19,6 +19,19 @@
         <Border Grid.Row="0" Background="White" BorderBrush="#DDDDDD" BorderThickness="0,0,0,1" Padding="12,10">
             <DockPanel LastChildFill="False">
                 <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
+                    <TextBlock Text="模型:"
+                               VerticalAlignment="Center"
+                               Margin="0,0,6,0"
+                               Foreground="#333333" />
+                    <ComboBox ItemsSource="{Binding PresetOptions}"
+                              DisplayMemberPath="DisplayName"
+                              SelectedValuePath="Preset"
+                              SelectedValue="{Binding SelectedPreset}"
+                              IsEnabled="{Binding IsReady}"
+                              Width="160"
+                              Height="28"
+                              VerticalContentAlignment="Center"
+                              Margin="0,0,12,0" />
                     <Button Content="选择图片"
                             Width="96"
                             Height="32"
