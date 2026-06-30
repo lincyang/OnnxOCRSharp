@@ -1,0 +1,152 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+
+    - name: Extract version
+      id: version
+      run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+    - name: Restore dependencies
+      run: dotnet restore
+
+    - name: Build
+      run: dotnet build --configuration Release --no-restore
+
+    - name: Pack NuGet package
+      run: |
+        dotnet pack src/OnnxOcr.App/OnnxOcr.App.csproj `
+          --configuration Release `
+          --no-build `
+          --output ./nupkgs `
+          -p:PackageVersion=${{ steps.version.outputs.VERSION }}
+
+    - name: Login to NuGet
+      uses: NuGet/login@v1
+      with:
+        nuget-server: https://api.nuget.org/v3/index.json
+        owner: Linc08
+
+    - name: Push NuGet package
+      run: dotnet nuget push "./nupkgs/*.nupkg" --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json
+
+    - name: Publish Desktop (Self-Contained, Single File)
+      run: |
+        dotnet publish src/OnnxOcr.Desktop/OnnxOcr.Desktop.csproj `
+          --configuration Release `
+          --runtime win-x64 `
+          --self-contained true `
+          -p:PublishSingleFile=true `
+          -p:IncludeNativeLibrariesForSelfExtract=true `
+          -p:EnableCompressionInSingleFile=true `
+          -o ./publish/OnnxOCRSharp-${{ steps.version.outputs.VERSION }}-win-x64
+
+    - name: Publish Console (Self-Contained)
+      run: |
+        dotnet publish src/OnnxOcr.Console/OnnxOcr.Console.csproj `
+          --configuration Release `
+          --runtime win-x64 `
+          --self-contained true `
+          -o ./publish/OnnxOCRSharp-${{ steps.version.outputs.VERSION }}-win-x64-console
+
+    - name: Create models directory
+      run: |
+        New-Item -ItemType Directory -Force -Path "./publish/OnnxOCRSharp-${{ steps.version.outputs.VERSION }}-win-x64/models/ppocrv6"
+        New-Item -ItemType Directory -Force -Path "./publish/OnnxOCRSharp-${{ steps.version.outputs.VERSION }}-win-x64/models/orientation"
+
+    - name: Create README for portable version
+      run: |
+        @"
+        OnnxOCRSharp 便携版 v${{ steps.version.outputs.VERSION }}
+        =========================
+
+        快速开始
+        --------
+        1. 双击 OnnxOCRSharp.exe 运行
+        2. 程序会提示下载模型，点击下载即可
+        3. 或者手动下载模型放入 models/ppocrv6/ 目录
+
+        模型下载
+        --------
+        方式一：使用内置下载服务（推荐）
+          运行程序后按提示下载。
+
+        方式二：手动下载（魔塔 ModelScope）
+          PP-OCRv6 tiny det:
+          https://www.modelscope.cn/models/PaddlePaddle/PP-OCRv6_tiny_det_onnx
+          PP-OCRv6 tiny rec:
+          https://www.modelscope.cn/models/PaddlePaddle/PP-OCRv6_tiny_rec_onnx
+
+          下载后解压到 models/ppocrv6/ 目录。
+
+        目录结构
+        --------
+        OnnxOCRSharp/
+        ├── OnnxOCRSharp.exe          主程序
+        ├── models/
+        │   └── ppocrv6/
+        │       ├── PP-OCRv6_tiny_det_onnx/
+        │       │   └── inference.onnx
+        │       └── PP-OCRv6_tiny_rec_onnx/
+        │           ├── inference.onnx
+        │           └── inference.yml
+        └── README.txt
+
+        技术支持
+        --------
+        GitHub: https://github.com/lincyang/OnnxOCRSharp
+        微信公众号: 程序员Linc
+        "@ | Out-File -FilePath "./publish/OnnxOCRSharp-${{ steps.version.outputs.VERSION }}-win-x64/README.txt" -Encoding utf8
+
+    - name: Pack to ZIP
+      run: |
+        Compress-Archive -Path "./publish/OnnxOCRSharp-${{ steps.version.outputs.VERSION }}-win-x64/*" `
+          -DestinationPath "./publish/OnnxOCRSharp-${{ steps.version.outputs.VERSION }}-win-x64-portable.zip" -Force
+
+    - name: Create GitHub Release (draft)
+      uses: softprops/action-gh-release@v1
+      with:
+        body: |
+          ## OnnxOCRSharp v${{ steps.version.outputs.VERSION }}
+
+          ### 下载
+
+          - **绿色便携版**：`OnnxOCRSharp-${{ steps.version.outputs.VERSION }}-win-x64-portable.zip`
+            - 解压即用，无需安装 .NET 运行时
+            - 双击 `OnnxOCRSharp.exe` 运行
+
+          ### 模型
+
+          首次运行请按提示下载模型，或从魔塔手动下载放入 `models/ppocrv6/` 目录。
+
+          - PP-OCRv6 tiny det: https://www.modelscope.cn/models/PaddlePaddle/PP-OCRv6_tiny_det_onnx
+          - PP-OCRv6 tiny rec: https://www.modelscope.cn/models/PaddlePaddle/PP-OCRv6_tiny_rec_onnx
+
+          ### NuGet 包
+
+          ```
+          dotnet add package OnnxOCRSharp --version ${{ steps.version.outputs.VERSION }}
+          ```
+        draft: true
+        files: |
+          ./publish/OnnxOCRSharp-${{ steps.version.outputs.VERSION }}-win-x64-portable.zip
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
