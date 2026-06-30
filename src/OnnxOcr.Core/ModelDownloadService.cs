@@ -41,7 +41,10 @@ public class ModelDownloadService : IDisposable
         if (!string.IsNullOrEmpty(detModelId))
             files.Add((detModelId, detFolder, detFileName));
         if (!string.IsNullOrEmpty(recModelId))
+        {
             files.Add((recModelId, recFolder, recFileName));
+            files.Add((recModelId, recFolder, "inference.yml"));
+        }
 
         if (files.Count == 0)
             throw new InvalidOperationException($"No ModelScope model IDs defined for preset {preset}.");

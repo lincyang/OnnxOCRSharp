@@ -96,12 +96,8 @@ internal static class ModelPathResolver
         {
             OcrModelPreset.PpOcrV5 => ResolveFirstExisting(
                 Path.Combine(FindPpOcrV5ModelsRoot(modelsRoot), "ppocrv5_dict.txt")),
-            OcrModelPreset.PpOcrV6Tiny => ResolveV6DictPath(
-                FindPpOcrV6ModelsRoot(modelsRoot),
-                "ppocrv6_tiny_dict.txt"),
-            OcrModelPreset.PpOcrV6Small or OcrModelPreset.PpOcrV6Medium => ResolveV6DictPath(
-                FindPpOcrV6ModelsRoot(modelsRoot),
-                "ppocrv6_dict.txt"),
+            OcrModelPreset.PpOcrV6Tiny => ResolveV6DictPath("tiny", modelsRoot),
+            OcrModelPreset.PpOcrV6Small or OcrModelPreset.PpOcrV6Medium => ResolveV6DictPath("small", modelsRoot),
             _ => throw new ArgumentOutOfRangeException(nameof(preset), preset, "Unsupported model preset."),
         };
     }
@@ -148,9 +144,14 @@ internal static class ModelPathResolver
             Path.Combine(v6Root, "rec", "rec.onnx"));
     }
 
-    private static string ResolveV6DictPath(string v6Root, string dictFileName)
+    private static string ResolveV6DictPath(string tier, string? modelsRoot)
     {
-        return ResolveFirstExisting(Path.Combine(v6Root, dictFileName));
+        var v6Root = FindPpOcrV6ModelsRoot(modelsRoot);
+        return ResolveFirstExisting(
+            Path.Combine(v6Root, $"PP-OCRv6_{tier}_rec_onnx", "inference.yml"),
+            Path.Combine(v6Root, tier, "rec", "inference.yml"),
+            Path.Combine(v6Root, "rec", "inference.yml"),
+            Path.Combine(v6Root, "inference.yml"));
     }
 
     private static string ResolveFirstExisting(params string[] candidates)

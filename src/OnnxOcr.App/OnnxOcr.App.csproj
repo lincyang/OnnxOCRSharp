@@ -1,4 +1,25 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+
+    <!-- NuGet Package Settings -->
+    <PackageId>OnnxOCRSharp</PackageId>
+    <Version>1.0.0</Version>
+    <Authors>程序员Linc</Authors>
+    <Company>程序员Linc</Company>
+    <Description>基于 ONNX Runtime + OpenCvSharp 的纯 .NET OCR 库，支持 PP-OCRv6 tiny / small / medium 模型。</Description>
+    <PackageTags>OCR;ONNX;PP-OCRv6;PaddleOCR;TextRecognition</PackageTags>
+    <PackageReadmeFile>NugetREADME.md</PackageReadmeFile>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/lincyang/OnnxOCRSharp</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/lincyang/OnnxOCRSharp.git</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <IsPackable>true</IsPackable>
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+  </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\OnnxOcr.Core\OnnxOcr.Core.csproj" />
@@ -9,10 +30,8 @@
     <PackageReference Include="OpenCvSharp4.runtime.win" Version="4.13.0.20260528" />
   </ItemGroup>
 
-  <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-  </PropertyGroup>
+  <ItemGroup>
+    <None Include="..\NugetREADME.md" Pack="true" PackagePath="" />
+  </ItemGroup>
 
 </Project>

@@ -20,8 +20,17 @@ public sealed class CtcLabelDecode
     {
         _characters = ["blank"];
 
-        foreach (var line in File.ReadLines(dictionaryPath, Encoding.UTF8))
-            _characters.Add(line.TrimEnd('\r', '\n'));
+        var ext = Path.GetExtension(dictionaryPath).ToLowerInvariant();
+        if (ext is ".yml" or ".yaml")
+        {
+            var chars = YamlDictParser.Parse(dictionaryPath);
+            _characters.AddRange(chars);
+        }
+        else
+        {
+            foreach (var line in File.ReadLines(dictionaryPath, Encoding.UTF8))
+                _characters.Add(line.TrimEnd('\r', '\n'));
+        }
 
         if (useSpaceChar)
             _characters.Add(" ");

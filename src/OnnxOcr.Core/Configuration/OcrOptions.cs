@@ -1,12 +1,12 @@
 //-----------------------------------------------------------------------
-// <copyright file="OcrOptions.cs" company="³ÌÐòÔ±Linc">
-// Copyright (c) ³ÌÐòÔ±Linc. All rights reserved.
+// <copyright file="OcrOptions.cs" company="ï¿½ï¿½ï¿½ï¿½Ô±Linc">
+// Copyright (c) ï¿½ï¿½ï¿½ï¿½Ô±Linc. All rights reserved.
 // </copyright>
-// <author>³ÌÐòÔ±Linc</author>
+// <author>ï¿½ï¿½ï¿½ï¿½Ô±Linc</author>
 // <website>
 // https://github.com/lincyang/OnnxOCRSharp
 // </website>
-// <wechat>¹«ÖÚºÅ£º³ÌÐòÔ±Linc</wechat>
+// <wechat>ï¿½ï¿½ï¿½ÚºÅ£ï¿½ï¿½ï¿½ï¿½ï¿½Ô±Linc</wechat>
 //-----------------------------------------------------------------------
 namespace OnnxOcr.Core.Configuration;
 
@@ -80,9 +80,9 @@ public sealed class OcrOptions
         var presetHint = ModelPreset switch
         {
             OcrModelPreset.PpOcrV6Tiny =>
-                "Download PP-OCRv6 tiny det/rec from ModelScope and place ppocrv6_tiny_dict.txt under models/ppocrv6/.",
+                "Download PP-OCRv6 tiny det/rec from ModelScope using ModelDownloadService.",
             OcrModelPreset.PpOcrV6Small or OcrModelPreset.PpOcrV6Medium =>
-                "Download PP-OCRv6 small/medium det/rec from ModelScope and place ppocrv6_dict.txt under models/ppocrv6/.",
+                "Download PP-OCRv6 small/medium det/rec from ModelScope using ModelDownloadService.",
             OcrModelPreset.PpOcrV5 =>
                 "Place PP-OCRv5 models under models/ppocrv5/ or call OcrOptions.ForPpOcrV5(modelsRoot).",
             _ => "Configure model paths manually or use OcrOptions.ForPreset(...).",
