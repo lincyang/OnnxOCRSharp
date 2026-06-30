@@ -43,7 +43,15 @@ jobs:
           -p:PackageVersion=${{ steps.version.outputs.VERSION }}
 
     - name: Push NuGet package (Trusted Publishing)
-      run: dotnet nuget push "./nupkgs/*.nupkg" --source "https://api.nuget.org/v3/index.json" --skip-duplicate
+      shell: pwsh
+      run: |
+        $nupkg = Get-ChildItem -Path "nupkgs" -Filter "*.nupkg" | Select-Object -First 1
+        if ($nupkg) {
+          dotnet nuget push $nupkg.FullName --source "https://api.nuget.org/v3/index.json" --skip-duplicate
+        } else {
+          Write-Error "No .nupkg file found in nupkgs/"
+          exit 1
+        }
 
     - name: Publish Desktop (Self-Contained, Single File)
       run: |
