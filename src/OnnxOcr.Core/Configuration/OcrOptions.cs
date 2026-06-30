@@ -42,7 +42,20 @@ public sealed class OcrOptions
 
     public bool UseAngleCls { get; set; }
 
-    public static OcrOptions CreateDefault() => ForPreset(OcrModelPreset.PpOcrV5);
+    public static OcrOptions CreateDefault() => ForPreset(OcrModelPreset.PpOcrV6Tiny);
+
+    public static bool TryValidatePreset(OcrModelPreset preset, string? modelsRoot = null)
+    {
+        try
+        {
+            ForPreset(preset, modelsRoot).Validate();
+            return true;
+        }
+        catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException)
+        {
+            return false;
+        }
+    }
 
     public static OcrOptions ForPreset(OcrModelPreset preset, string? modelsRoot = null)
     {
@@ -66,28 +79,12 @@ public sealed class OcrOptions
     public void Validate()
     {
         if (!File.Exists(DetModelPath))
-            throw new FileNotFoundException(BuildMissingFileMessage("Detection model", DetModelPath));
+            throw new FileNotFoundException("Detection model not found.");
 
         if (!File.Exists(RecModelPath))
-            throw new FileNotFoundException(BuildMissingFileMessage("Recognition model", RecModelPath));
+            throw new FileNotFoundException("Recognition model not found.");
 
         if (!File.Exists(DictPath))
-            throw new FileNotFoundException(BuildMissingFileMessage("Dictionary", DictPath));
-    }
-
-    private string BuildMissingFileMessage(string kind, string path)
-    {
-        var presetHint = ModelPreset switch
-        {
-            OcrModelPreset.PpOcrV6Tiny =>
-                "Download PP-OCRv6 tiny det/rec from ModelScope using ModelDownloadService.",
-            OcrModelPreset.PpOcrV6Small or OcrModelPreset.PpOcrV6Medium =>
-                "Download PP-OCRv6 small/medium det/rec from ModelScope using ModelDownloadService.",
-            OcrModelPreset.PpOcrV5 =>
-                "Place PP-OCRv5 models under models/ppocrv5/ or call OcrOptions.ForPpOcrV5(modelsRoot).",
-            _ => "Configure model paths manually or use OcrOptions.ForPreset(...).",
-        };
-
-        return $"{kind} not found: {path}{Environment.NewLine}{presetHint}";
+            throw new FileNotFoundException("Dictionary not found.");
     }
 }

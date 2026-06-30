@@ -27,7 +27,6 @@
                               DisplayMemberPath="DisplayName"
                               SelectedValuePath="Preset"
                               SelectedValue="{Binding SelectedPreset}"
-                              IsEnabled="{Binding IsReady}"
                               Width="160"
                               Height="28"
                               VerticalContentAlignment="Center"
@@ -154,7 +153,8 @@
         </Border>
 
         <!-- Loading overlay -->
-        <Border Grid.RowSpan="3"
+        <Border Grid.Row="1"
+                Grid.RowSpan="2"
                 Background="#80000000">
             <Border.Style>
                 <Style TargetType="Border">
@@ -180,7 +180,8 @@
         </Border>
 
         <!-- Download overlay -->
-        <Border Grid.RowSpan="3"
+        <Border Grid.Row="1"
+                Grid.RowSpan="2"
                 Background="#80000000">
             <Border.Style>
                 <Style TargetType="Border">
@@ -225,7 +226,8 @@
         </Border>
 
         <!-- Download prompt overlay -->
-        <Border Grid.RowSpan="3"
+        <Border Grid.Row="1"
+                Grid.RowSpan="2"
                 Background="#80000000">
             <Border.Style>
                 <Style TargetType="Border">
@@ -249,17 +251,11 @@
                                FontWeight="SemiBold"
                                HorizontalAlignment="Center"
                                Margin="0,0,0,8" />
-                    <TextBlock Text="当前选择的模型尚未下载，是否从魔塔(ModelScope)下载？"
+                    <TextBlock Text="当前选择的模型尚未安装。"
                                Foreground="#666666"
                                FontSize="13"
                                TextWrapping="Wrap"
                                TextAlignment="Center"
-                               Margin="0,0,0,4"
-                               MaxWidth="340" />
-                    <TextBlock Text="{Binding DownloadErrorMessage}"
-                               Foreground="#999999"
-                               FontSize="11"
-                               TextWrapping="Wrap"
                                Margin="0,0,0,16"
                                MaxWidth="340" />
                     <StackPanel Orientation="Horizontal"
@@ -268,8 +264,19 @@
                                 Width="110"
                                 Height="32"
                                 Margin="0,0,12,0"
-                                Command="{Binding DownloadModelCommand}" />
-                        <Button Content="取消"
+                                Command="{Binding DownloadModelCommand}">
+                            <Button.Style>
+                                <Style TargetType="Button">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsDownloadSupported}" Value="False">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+                        <Button Content="知道了"
                                 Width="80"
                                 Height="32"
                                 IsCancel="True"

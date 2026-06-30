@@ -29,15 +29,7 @@ internal static class ModelPathResolver
                 return candidateInSibling;
         }
 
-        throw new DirectoryNotFoundException(
-            BuildMissingRootMessage(
-                "PP-OCRv5",
-                """
-                models/ppocrv5/
-                ├── det/det.onnx
-                ├── rec/rec.onnx
-                └── ppocrv5_dict.txt
-                """));
+        throw new DirectoryNotFoundException("PP-OCRv5 models not found.");
     }
 
     public static string FindPpOcrV6ModelsRoot(string? modelsRoot = null)
@@ -53,15 +45,7 @@ internal static class ModelPathResolver
                 return candidateDirect;
         }
 
-        throw new DirectoryNotFoundException(
-            BuildMissingRootMessage(
-                "PP-OCRv6",
-                """
-                models/ppocrv6/
-                ├── PP-OCRv6_tiny_det_onnx/inference.onnx
-                ├── PP-OCRv6_tiny_rec_onnx/inference.onnx
-                └── ppocrv6_tiny_dict.txt
-                """));
+        throw new DirectoryNotFoundException("PP-OCRv6 models not found.");
     }
 
     public static string ResolveDetModelPath(OcrModelPreset preset, string? modelsRoot = null)
@@ -97,7 +81,8 @@ internal static class ModelPathResolver
             OcrModelPreset.PpOcrV5 => ResolveFirstExisting(
                 Path.Combine(FindPpOcrV5ModelsRoot(modelsRoot), "ppocrv5_dict.txt")),
             OcrModelPreset.PpOcrV6Tiny => ResolveV6DictPath("tiny", modelsRoot),
-            OcrModelPreset.PpOcrV6Small or OcrModelPreset.PpOcrV6Medium => ResolveV6DictPath("small", modelsRoot),
+            OcrModelPreset.PpOcrV6Small => ResolveV6DictPath("small", modelsRoot),
+            OcrModelPreset.PpOcrV6Medium => ResolveV6DictPath("medium", modelsRoot),
             _ => throw new ArgumentOutOfRangeException(nameof(preset), preset, "Unsupported model preset."),
         };
     }
@@ -150,8 +135,7 @@ internal static class ModelPathResolver
         return ResolveFirstExisting(
             Path.Combine(v6Root, $"PP-OCRv6_{tier}_rec_onnx", "inference.yml"),
             Path.Combine(v6Root, tier, "rec", "inference.yml"),
-            Path.Combine(v6Root, "rec", "inference.yml"),
-            Path.Combine(v6Root, "inference.yml"));
+            Path.Combine(v6Root, "rec", "inference.yml"));
     }
 
     private static string ResolveFirstExisting(params string[] candidates)
@@ -162,9 +146,7 @@ internal static class ModelPathResolver
                 return candidate;
         }
 
-        throw new FileNotFoundException(
-            "Could not locate model file. Checked paths:" + Environment.NewLine +
-            string.Join(Environment.NewLine, candidates.Select(path => $"  - {path}")));
+        throw new FileNotFoundException("Model file not found.");
     }
 
     private static IEnumerable<string> GetSearchRoots(string? modelsRoot)
@@ -193,7 +175,4 @@ internal static class ModelPathResolver
         }
     }
 
-    private static string BuildMissingRootMessage(string family, string layoutExample)
-        => $"Could not locate {family} models directory.{Environment.NewLine}" +
-           $"Expected layout:{Environment.NewLine}{layoutExample}";
 }

@@ -26,9 +26,7 @@ public sealed class OnnxSessionFactory
     {
         if (!File.Exists(modelPath))
         {
-            throw new FileNotFoundException(
-                $"Model file not found: {modelPath}. " +
-                "Ensure OnnxOCR models are available or update OcrOptions.");
+            throw new FileNotFoundException("Model file not found.");
         }
 
         var sessionOptions = new SessionOptions

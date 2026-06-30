@@ -64,7 +64,7 @@ static bool TryParseArguments(
     out string? modelsRoot,
     out string imagePath)
 {
-    preset = OcrModelPreset.PpOcrV5;
+    preset = OcrModelPreset.PpOcrV6Tiny;
     modelsRoot = null;
     imagePath = "";
 

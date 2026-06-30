@@ -48,13 +48,12 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
             new(OcrModelPreset.PpOcrV6Small, "PP-OCRv6 Small"),
             new(OcrModelPreset.PpOcrV6Medium, "PP-OCRv6 Medium"),
         };
-        _selectedPreset = OcrModelPreset.PpOcrV5;
     }
 
     public List<PresetOption> PresetOptions { get; }
 
     [ObservableProperty]
-    private OcrModelPreset _selectedPreset;
+    private OcrModelPreset _selectedPreset = OcrModelPreset.PpOcrV6Tiny;
 
     [ObservableProperty]
     private BitmapSource? _previewImage;
@@ -90,7 +89,7 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
     private bool _needsDownload;
 
     [ObservableProperty]
-    private string _downloadErrorMessage = "";
+    private bool _isDownloadSupported;
 
     public ObservableCollection<OcrLineViewModel> Lines { get; } = new();
 
@@ -116,20 +115,15 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
         {
             _recognizeCts?.Cancel();
             NeedsDownload = false;
-            DownloadErrorMessage = "";
+            IsDownloadSupported = false;
 
             IsBusy = true;
             IsReady = false;
-            var presetName = PresetOptions.First(p => p.Preset == preset).DisplayName;
-            StatusMessage = $"正在加载模型 ({presetName})...";
+            StatusMessage = "正在加载模型...";
 
-            if (IsV6Preset(preset) && !CheckV6ModelExists(preset))
+            if (!OcrOptions.TryValidatePreset(preset))
             {
-                NeedsDownload = true;
-                DownloadErrorMessage = $"PP-OCRv6 模型文件未找到，请从魔塔下载后使用。";
-                StatusMessage = "模型文件未找到";
-                IsBusy = false;
-                RefreshCommands();
+                ShowModelMissing(preset);
                 return;
             }
 
@@ -151,12 +145,9 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
         }
         catch (Exception ex)
         {
-            if (IsModelNotFoundException(ex) && IsV6Preset(preset))
+            if (IsModelNotFoundException(ex))
             {
-                NeedsDownload = true;
-                DownloadErrorMessage = ex.Message;
-                StatusMessage = "模型文件未找到";
-                IsReady = false;
+                ShowModelMissing(preset);
             }
             else
             {
@@ -172,45 +163,12 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
         }
     }
 
-    private static bool CheckV6ModelExists(OcrModelPreset preset)
+    private void ShowModelMissing(OcrModelPreset preset)
     {
-        var tier = preset switch
-        {
-            OcrModelPreset.PpOcrV6Tiny => "tiny",
-            OcrModelPreset.PpOcrV6Small => "small",
-            OcrModelPreset.PpOcrV6Medium => "medium",
-            _ => ""
-        };
-        if (string.IsNullOrEmpty(tier))
-            return false;
-
-        var searchRoot = AppContext.BaseDirectory;
-        for (var dir = new DirectoryInfo(searchRoot); dir != null; dir = dir.Parent)
-        {
-            var v6Root = Path.Combine(dir.FullName, "models", "ppocrv6");
-            if (!Directory.Exists(v6Root))
-                continue;
-
-            var detCandidates = new[]
-            {
-                Path.Combine(v6Root, $"PP-OCRv6_{tier}_det_onnx", "inference.onnx"),
-                Path.Combine(v6Root, tier, "det", "inference.onnx"),
-                Path.Combine(v6Root, tier, "det", "det.onnx"),
-            };
-            var recCandidates = new[]
-            {
-                Path.Combine(v6Root, $"PP-OCRv6_{tier}_rec_onnx", "inference.onnx"),
-                Path.Combine(v6Root, tier, "rec", "inference.onnx"),
-                Path.Combine(v6Root, tier, "rec", "rec.onnx"),
-            };
-
-            var detFound = detCandidates.Any(File.Exists);
-            var recFound = recCandidates.Any(File.Exists);
-            if (detFound && recFound)
-                return true;
-        }
-
-        return false;
+        NeedsDownload = true;
+        IsDownloadSupported = IsV6Preset(preset);
+        StatusMessage = "模型文件未找到";
+        IsReady = false;
     }
 
     private static bool IsModelNotFoundException(Exception ex)
@@ -278,7 +236,7 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
         }
     }
 
-    private bool CanDownload() => !IsBusy && !IsDownloading;
+    private bool CanDownload() => IsDownloadSupported && !IsBusy && !IsDownloading;
 
     private string FindModelsRoot()
     {
@@ -302,8 +260,7 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
 
     partial void OnSelectedPresetChanged(OcrModelPreset value)
     {
-        if (_ocrService != null)
-            _ = LoadModelAsync(value);
+        _ = LoadModelAsync(value);
     }
 
     [RelayCommand(CanExecute = nameof(CanOpenImage))]
@@ -396,7 +353,6 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
 
         IsDownloading = false;
         NeedsDownload = false;
-        DownloadErrorMessage = "";
         DownloadProgress = 0;
         DownloadStatus = "";
         IsBusy = false;
@@ -416,12 +372,8 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
     private void DismissDownloadPrompt()
     {
         NeedsDownload = false;
-        DownloadErrorMessage = "";
-        if (_ocrService != null)
-        {
-            IsReady = true;
-            StatusMessage = "就绪";
-        }
+        IsDownloadSupported = false;
+        StatusMessage = "模型未就绪";
     }
 
     [RelayCommand(CanExecute = nameof(CanRecognize))]

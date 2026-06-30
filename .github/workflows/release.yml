@@ -84,8 +84,9 @@ jobs:
 
     - name: Create models directory
       run: |
-        New-Item -ItemType Directory -Force -Path "./publish/OnnxOCRSharp-${{ steps.version.outputs.VERSION }}-win-x64/models/ppocrv6"
-        New-Item -ItemType Directory -Force -Path "./publish/OnnxOCRSharp-${{ steps.version.outputs.VERSION }}-win-x64/models/orientation"
+        $publishRoot = "./publish/OnnxOCRSharp-${{ steps.version.outputs.VERSION }}-win-x64"
+        New-Item -ItemType Directory -Force -Path "$publishRoot/models/ppocrv6"
+        New-Item -ItemType Directory -Force -Path "$publishRoot/models/orientation"
 
     - name: Create README for portable version
       run: |
