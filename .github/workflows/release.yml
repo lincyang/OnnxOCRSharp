@@ -43,21 +43,25 @@ jobs:
           --output ./nupkgs `
           -p:PackageVersion=${{ steps.version.outputs.VERSION }}
 
-    - name: Setup NuGet.exe
-      uses: NuGet/setup-nuget@v2
+    - name: NuGet Login (Trusted Publishing)
+      uses: NuGet/login@v1
+      id: nuget_login
       with:
-        nuget-version: latest
+        user: Linc08
 
-    - name: Push NuGet package (Trusted Publishing)
+    - name: Push NuGet package
       shell: pwsh
       run: |
         $nupkg = Get-ChildItem -Path "nupkgs" -Filter "*.nupkg" | Select-Object -First 1
-        if ($nupkg) {
-          nuget push $nupkg.FullName -Source "https://api.nuget.org/v3/index.json" -SkipDuplicate
-        } else {
+        if (-not $nupkg) {
           Write-Error "No .nupkg file found in nupkgs/"
           exit 1
         }
+
+        dotnet nuget push $nupkg.FullName `
+          --source https://api.nuget.org/v3/index.json `
+          --api-key "${{ steps.nuget_login.outputs.NUGET_API_KEY }}" `
+          --skip-duplicate
 
     - name: Publish Desktop (Self-Contained, Single File)
       run: |
