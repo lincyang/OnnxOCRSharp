@@ -43,12 +43,17 @@ jobs:
           --output ./nupkgs `
           -p:PackageVersion=${{ steps.version.outputs.VERSION }}
 
+    - name: Setup NuGet.exe
+      uses: NuGet/setup-nuget@v2
+      with:
+        nuget-version: latest
+
     - name: Push NuGet package (Trusted Publishing)
       shell: pwsh
       run: |
         $nupkg = Get-ChildItem -Path "nupkgs" -Filter "*.nupkg" | Select-Object -First 1
         if ($nupkg) {
-          dotnet nuget push $nupkg.FullName --source "https://api.nuget.org/v3/index.json" --skip-duplicate
+          nuget push $nupkg.FullName -Source "https://api.nuget.org/v3/index.json" -SkipDuplicate
         } else {
           Write-Error "No .nupkg file found in nupkgs/"
           exit 1
