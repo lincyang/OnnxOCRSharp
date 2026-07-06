@@ -1,19 +1,15 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
+    <OutputType>Exe</OutputType>
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <IsPackable>false</IsPackable>
+    <AssemblyName>GenerateCropBugImage</AssemblyName>
+    <RootNamespace>GenerateCropBugImage</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>
-    <InternalsVisibleTo Include="ReproCropDispose" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <PackageReference Include="Clipper2" Version="2.0.0" />
-    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.26.0" />
     <PackageReference Include="OpenCvSharp4" Version="4.13.0.20260528" />
     <PackageReference Include="OpenCvSharp4.runtime.win" Version="4.13.0.20260528" />
   </ItemGroup>

@@ -50,10 +50,12 @@ internal static class ImageCropper
 
         if (cropped.Rows * 1.0 / cropped.Cols >= 1.5)
         {
-            using var rotated = new Mat();
-            Cv2.Rotate(cropped, rotated, RotateFlags.Rotate90Clockwise);
-            cropped.Dispose();
-            return rotated;
+            using (cropped)
+            {
+                var rotated = new Mat();
+                Cv2.Rotate(cropped, rotated, RotateFlags.Rotate90Clockwise);
+                return rotated;
+            }
         }
 
         return cropped;
