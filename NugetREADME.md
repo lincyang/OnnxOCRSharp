@@ -81,6 +81,9 @@ models/ppocrv6/
 └── PP-OCRv6_tiny_rec_onnx/
     ├── inference.onnx
     └── inference.yml
+
+models/orientation/
+└── rapid_orientation.onnx   ← 竖排/倾斜文本方向校正（下载时自动获取）
 ```
 
 > **提示**：字典自动从 rec 模型目录的 `inference.yml` 解析，无需手动下载字典文件。

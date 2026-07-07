@@ -17,8 +17,10 @@ internal static class OcrModelProfiles
         options.ModelPreset = preset;
         options.DetModelPath = ModelPathResolver.ResolveDetModelPath(preset, modelsRoot);
         options.RecModelPath = ModelPathResolver.ResolveRecModelPath(preset, modelsRoot);
-        options.DictPath = ModelPathResolver.ResolveDictPath(preset, modelsRoot);
+        options.DictPath = ModelPathResolver.ResolveRecDictionaryPath(options.RecModelPath);
         options.OrientationModelPath = ModelPathResolver.FindOrientationModelPath(modelsRoot);
+        options.UseAngleCls = !string.IsNullOrWhiteSpace(options.OrientationModelPath)
+            && File.Exists(options.OrientationModelPath);
 
         switch (preset)
         {
@@ -29,6 +31,7 @@ internal static class OcrModelProfiles
             case OcrModelPreset.PpOcrV6Small:
             case OcrModelPreset.PpOcrV6Medium:
                 ApplyPpOcrV6Defaults(options);
+                InferenceYamlProfile.Apply(options);
                 break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(preset), preset, "Unsupported model preset.");

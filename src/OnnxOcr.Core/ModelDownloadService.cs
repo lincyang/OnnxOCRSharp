@@ -8,6 +8,7 @@
 // </website>
 // <wechat>公众号：程序员Linc</wechat>
 //-----------------------------------------------------------------------
+using System.IO.Compression;
 using System.Net.Http;
 using OnnxOcr.Core.Configuration;
 
@@ -17,6 +18,9 @@ public class ModelDownloadService : IDisposable
 {
     private readonly HttpClient _httpClient;
     private const string ModelScopeEndpoint = "https://modelscope.cn";
+    private const string OrientationModelsZipUrl =
+        "https://github.com/RapidAI/RapidOrientation/releases/download/v0.0.0/rapid_orientation_models_v2.zip";
+    private const string OrientationModelFileName = "rapid_orientation.onnx";
 
     public event Action<string>? StatusChanged;
     public event Action<double>? ProgressChanged;
@@ -39,7 +43,10 @@ public class ModelDownloadService : IDisposable
 
         var files = new List<(string ModelId, string Folder, string FileName)>();
         if (!string.IsNullOrEmpty(detModelId))
+        {
             files.Add((detModelId, detFolder, detFileName));
+            files.Add((detModelId, detFolder, "inference.yml"));
+        }
         if (!string.IsNullOrEmpty(recModelId))
         {
             files.Add((recModelId, recFolder, recFileName));
@@ -49,7 +56,10 @@ public class ModelDownloadService : IDisposable
         if (files.Count == 0)
             throw new InvalidOperationException($"No ModelScope model IDs defined for preset {preset}.");
 
-        int fileIndex = 0;
+        var includeOrientation = IsV6Preset(preset);
+        var totalSteps = files.Count + (includeOrientation ? 1 : 0);
+        var fileIndex = 0;
+
         foreach (var (modelId, folder, fileName) in files)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -61,9 +71,74 @@ public class ModelDownloadService : IDisposable
             await DownloadFileAsync(modelId, fileName, localPath, cancellationToken);
 
             fileIndex++;
-            ProgressChanged?.Invoke((double)fileIndex / files.Count);
+            ProgressChanged?.Invoke((double)fileIndex / totalSteps);
+        }
+
+        if (includeOrientation)
+        {
+            var modelsRoot = Directory.GetParent(targetDir)?.FullName ?? targetDir;
+            await DownloadOrientationModelAsync(modelsRoot, cancellationToken);
+            fileIndex++;
+            ProgressChanged?.Invoke((double)fileIndex / totalSteps);
         }
     }
+
+    public async Task DownloadOrientationModelAsync(string modelsRoot, CancellationToken cancellationToken = default)
+    {
+        var localPath = Path.Combine(modelsRoot, "orientation", OrientationModelFileName);
+        if (File.Exists(localPath))
+        {
+            StatusChanged?.Invoke($"  已存在，跳过: {OrientationModelFileName}");
+            return;
+        }
+
+        StatusChanged?.Invoke($"下载: orientation/{OrientationModelFileName}");
+        Directory.CreateDirectory(Path.GetDirectoryName(localPath)!);
+
+        var tempZip = Path.Combine(Path.GetTempPath(), $"onnxocr_orientation_{Guid.NewGuid():N}.zip");
+        try
+        {
+            await DownloadDirectUrlAsync(OrientationModelsZipUrl, tempZip, cancellationToken);
+            ExtractOrientationModelFromZip(tempZip, localPath);
+            StatusChanged?.Invoke($"  完成: {OrientationModelFileName}");
+        }
+        finally
+        {
+            if (File.Exists(tempZip))
+                File.Delete(tempZip);
+        }
+    }
+
+    private async Task DownloadDirectUrlAsync(string url, string localPath, CancellationToken cancellationToken)
+    {
+        StatusChanged?.Invoke($"  下载中: {Path.GetFileName(localPath)}");
+        Directory.CreateDirectory(Path.GetDirectoryName(localPath)!);
+
+        var response = await _httpClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        response.EnsureSuccessStatusCode();
+
+        await using var fileStream = new FileStream(localPath, FileMode.Create, FileAccess.Write, FileShare.None);
+        await using var contentStream = await response.Content.ReadAsStreamAsync(cancellationToken);
+        var buffer = new byte[81920];
+        int bytesRead;
+        while ((bytesRead = await contentStream.ReadAsync(buffer, cancellationToken)) > 0)
+            await fileStream.WriteAsync(buffer.AsMemory(0, bytesRead), cancellationToken);
+    }
+
+    private static void ExtractOrientationModelFromZip(string zipPath, string destinationPath)
+    {
+        using var archive = ZipFile.OpenRead(zipPath);
+        var entry = archive.Entries.FirstOrDefault(item =>
+            item.FullName.Replace('\\', '/').EndsWith(OrientationModelFileName, StringComparison.OrdinalIgnoreCase));
+
+        if (entry == null)
+            throw new InvalidOperationException($"Could not find {OrientationModelFileName} in orientation model package.");
+
+        entry.ExtractToFile(destinationPath, overwrite: true);
+    }
+
+    private static bool IsV6Preset(OcrModelPreset preset)
+        => preset is OcrModelPreset.PpOcrV6Tiny or OcrModelPreset.PpOcrV6Small or OcrModelPreset.PpOcrV6Medium;
 
     private async Task DownloadFileAsync(string modelId, string fileName, string localPath, CancellationToken cancellationToken)
     {

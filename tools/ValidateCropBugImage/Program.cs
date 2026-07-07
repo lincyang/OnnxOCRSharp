@@ -22,6 +22,8 @@ Console.WriteLine($"尺寸: {image.Cols}x{image.Rows}");
 Console.WriteLine();
 
 var options = OcrOptions.ForPpOcrV6Tiny(Path.Combine(repoRoot, "models"));
+Console.WriteLine($"方向分类: {(options.UseAngleCls ? "已启用" : "未启用（需 models/orientation/rapid_orientation.onnx）")}");
+Console.WriteLine();
 using var detector = new TextDetector(options, new OnnxSessionFactory(options));
 var boxes = detector.Detect(image);
 

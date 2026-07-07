@@ -80,11 +80,20 @@ internal static class ModelPathResolver
         {
             OcrModelPreset.PpOcrV5 => ResolveFirstExisting(
                 Path.Combine(FindPpOcrV5ModelsRoot(modelsRoot), "ppocrv5_dict.txt")),
-            OcrModelPreset.PpOcrV6Tiny => ResolveV6DictPath("tiny", modelsRoot),
-            OcrModelPreset.PpOcrV6Small => ResolveV6DictPath("small", modelsRoot),
-            OcrModelPreset.PpOcrV6Medium => ResolveV6DictPath("medium", modelsRoot),
+            OcrModelPreset.PpOcrV6Tiny => ResolveRecDictionaryPath(ResolveV6RecModel("tiny", modelsRoot)),
+            OcrModelPreset.PpOcrV6Small => ResolveRecDictionaryPath(ResolveV6RecModel("small", modelsRoot)),
+            OcrModelPreset.PpOcrV6Medium => ResolveRecDictionaryPath(ResolveV6RecModel("medium", modelsRoot)),
             _ => throw new ArgumentOutOfRangeException(nameof(preset), preset, "Unsupported model preset."),
         };
+    }
+
+    public static string ResolveRecDictionaryPath(string recModelPath)
+    {
+        var dictPath = Path.Combine(Path.GetDirectoryName(recModelPath)!, "inference.yml");
+        if (!File.Exists(dictPath))
+            throw new FileNotFoundException("Dictionary not found.");
+
+        return dictPath;
     }
 
     public static string FindOrientationModelPath(string? modelsRoot = null)
@@ -113,9 +122,7 @@ internal static class ModelPathResolver
         return ResolveFirstExisting(
             Path.Combine(v6Root, $"PP-OCRv6_{tier}_det_onnx", "inference.onnx"),
             Path.Combine(v6Root, tier, "det", "inference.onnx"),
-            Path.Combine(v6Root, tier, "det", "det.onnx"),
-            Path.Combine(v6Root, "det", "inference.onnx"),
-            Path.Combine(v6Root, "det", "det.onnx"));
+            Path.Combine(v6Root, tier, "det", "det.onnx"));
     }
 
     private static string ResolveV6RecModel(string tier, string? modelsRoot)
@@ -124,18 +131,7 @@ internal static class ModelPathResolver
         return ResolveFirstExisting(
             Path.Combine(v6Root, $"PP-OCRv6_{tier}_rec_onnx", "inference.onnx"),
             Path.Combine(v6Root, tier, "rec", "inference.onnx"),
-            Path.Combine(v6Root, tier, "rec", "rec.onnx"),
-            Path.Combine(v6Root, "rec", "inference.onnx"),
-            Path.Combine(v6Root, "rec", "rec.onnx"));
-    }
-
-    private static string ResolveV6DictPath(string tier, string? modelsRoot)
-    {
-        var v6Root = FindPpOcrV6ModelsRoot(modelsRoot);
-        return ResolveFirstExisting(
-            Path.Combine(v6Root, $"PP-OCRv6_{tier}_rec_onnx", "inference.yml"),
-            Path.Combine(v6Root, tier, "rec", "inference.yml"),
-            Path.Combine(v6Root, "rec", "inference.yml"));
+            Path.Combine(v6Root, tier, "rec", "rec.onnx"));
     }
 
     private static string ResolveFirstExisting(params string[] candidates)

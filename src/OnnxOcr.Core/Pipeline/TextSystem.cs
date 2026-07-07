@@ -13,6 +13,7 @@ using OnnxOcr.Core.Detection;
 using OnnxOcr.Core.Imaging;
 using OnnxOcr.Core.Inference;
 using OnnxOcr.Core.Models;
+using OnnxOcr.Core.Orientation;
 using OnnxOcr.Core.Recognition;
 using OpenCvSharp;
 
@@ -23,6 +24,7 @@ public sealed class TextSystem : IDisposable
     private readonly OcrOptions _options;
     private readonly Detection.TextDetector _detector;
     private readonly TextRecognizer _recognizer;
+    private readonly TextOrientationClassifier? _orientationClassifier;
 
     public TextSystem(OcrOptions options)
     {
@@ -32,6 +34,13 @@ public sealed class TextSystem : IDisposable
         var sessionFactory = new OnnxSessionFactory(options);
         _detector = new Detection.TextDetector(options, sessionFactory);
         _recognizer = new TextRecognizer(options, sessionFactory);
+
+        if (options.UseAngleCls
+            && !string.IsNullOrWhiteSpace(options.OrientationModelPath)
+            && File.Exists(options.OrientationModelPath))
+        {
+            _orientationClassifier = new TextOrientationClassifier(options, sessionFactory);
+        }
     }
 
     public OcrResult Run(Mat image)
@@ -53,8 +62,27 @@ public sealed class TextSystem : IDisposable
 
         var sortedBoxes = BoxSorter.Sort(boxes);
         var crops = new List<Mat>(sortedBoxes.Count);
+
         foreach (var box in sortedBoxes)
-            crops.Add(ImageCropper.Crop(image, box, _options.DetBoxType));
+        {
+            var crop = ImageCropper.Crop(
+                image,
+                box,
+                _options.DetBoxType,
+                applyVerticalRotate: _orientationClassifier == null);
+
+            if (_orientationClassifier != null)
+            {
+                var corrected = _orientationClassifier.CorrectOrientation(crop);
+                if (!ReferenceEquals(corrected, crop))
+                {
+                    crop.Dispose();
+                    crop = corrected;
+                }
+            }
+
+            crops.Add(crop);
+        }
 
         try
         {
@@ -94,5 +122,6 @@ public sealed class TextSystem : IDisposable
     {
         _detector.Dispose();
         _recognizer.Dispose();
+        _orientationClassifier?.Dispose();
     }
 }

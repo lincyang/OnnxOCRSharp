@@ -14,14 +14,14 @@ namespace OnnxOcr.Core.Imaging;
 
 internal static class ImageCropper
 {
-    public static Mat Crop(Mat image, Point2f[] points, string boxType)
+    public static Mat Crop(Mat image, Point2f[] points, string boxType, bool applyVerticalRotate = true)
     {
         return boxType == "quad"
-            ? GetRotateCropImage(image, points)
-            : GetMinAreaRectCrop(image, points);
+            ? GetRotateCropImage(image, points, applyVerticalRotate)
+            : GetMinAreaRectCrop(image, points, applyVerticalRotate);
     }
 
-    private static Mat GetRotateCropImage(Mat image, Point2f[] points)
+    private static Mat GetRotateCropImage(Mat image, Point2f[] points, bool applyVerticalRotate)
     {
         if (points.Length != 4)
             throw new ArgumentException("A text box must contain 4 points.", nameof(points));
@@ -48,7 +48,7 @@ internal static class ImageCropper
             InterpolationFlags.Cubic,
             BorderTypes.Replicate);
 
-        if (cropped.Rows * 1.0 / cropped.Cols >= 1.5)
+        if (applyVerticalRotate && cropped.Rows * 1.0 / cropped.Cols >= 1.5)
         {
             using (cropped)
             {
@@ -61,7 +61,7 @@ internal static class ImageCropper
         return cropped;
     }
 
-    private static Mat GetMinAreaRectCrop(Mat image, Point2f[] points)
+    private static Mat GetMinAreaRectCrop(Mat image, Point2f[] points, bool applyVerticalRotate)
     {
         var rotatedRect = Cv2.MinAreaRect(points.Select(point => new Point((int)point.X, (int)point.Y)).ToArray());
         var boxPoints = Cv2.BoxPoints(rotatedRect)
@@ -103,7 +103,7 @@ internal static class ImageCropper
             boxPoints[indexD],
         };
 
-        return GetRotateCropImage(image, ordered);
+        return GetRotateCropImage(image, ordered, applyVerticalRotate);
     }
 
     private static float Distance(Point2f a, Point2f b)
