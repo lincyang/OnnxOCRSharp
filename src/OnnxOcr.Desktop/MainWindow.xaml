@@ -31,6 +31,42 @@
                               Height="28"
                               VerticalContentAlignment="Center"
                               Margin="0,0,12,0" />
+                    <TextBlock Text="设备:"
+                               VerticalAlignment="Center"
+                               Margin="0,0,6,0"
+                               Foreground="#333333" />
+                    <ComboBox ItemsSource="{Binding DeviceOptions}"
+                              DisplayMemberPath="DisplayName"
+                              SelectedValuePath="Device"
+                              SelectedValue="{Binding SelectedDevice}"
+                              Width="80"
+                              Height="28"
+                              VerticalContentAlignment="Center"
+                              Margin="0,0,12,0" />
+                    <StackPanel Orientation="Horizontal">
+                        <StackPanel.Style>
+                            <Style TargetType="StackPanel">
+                                <Setter Property="Visibility" Value="Visible" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsGpuSelected}" Value="False">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </StackPanel.Style>
+                        <TextBlock Text="GPU:"
+                                   VerticalAlignment="Center"
+                                   Margin="0,0,6,0"
+                                   Foreground="#333333" />
+                        <ComboBox ItemsSource="{Binding GpuDevices}"
+                                  SelectedValue="{Binding SelectedGpuDevice}"
+                                  SelectedValuePath="."
+                                  DisplayMemberPath="DisplayLabel"
+                                  Width="200"
+                                  Height="28"
+                                  VerticalContentAlignment="Center"
+                                  Margin="0,0,12,0" />
+                    </StackPanel>
                     <Button Content="选择图片"
                             Width="96"
                             Height="32"
@@ -108,7 +144,9 @@
                 <Grid Margin="12">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
-                        <RowDefinition Height="*" />
+                        <RowDefinition Height="2*" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" MinHeight="80" />
                     </Grid.RowDefinitions>
                     <TextBlock Grid.Row="0"
                                Text="识别结果"
@@ -134,6 +172,19 @@
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>
+                    <TextBlock Grid.Row="2"
+                               Text="运行日志"
+                               FontSize="14"
+                               FontWeight="SemiBold"
+                               Margin="0,8,0,4" />
+                    <ListBox Grid.Row="3"
+                             ItemsSource="{Binding LogMessages}"
+                             BorderThickness="0"
+                             FontFamily="Consolas"
+                             FontSize="11"
+                             Foreground="#555555"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                             ScrollViewer.VerticalScrollBarVisibility="Auto" />
                 </Grid>
             </Border>
         </Grid>

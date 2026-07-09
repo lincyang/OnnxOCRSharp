@@ -1,12 +1,12 @@
 //-----------------------------------------------------------------------
-// <copyright file="OcrOptions.cs" company="����ԱLinc">
-// Copyright (c) ����ԱLinc. All rights reserved.
+// <copyright file="OcrOptions.cs" company="程序员Linc">
+// Copyright (c) 程序员Linc. All rights reserved.
 // </copyright>
-// <author>����ԱLinc</author>
+// <author>程序员Linc</author>
 // <website>
 // https://github.com/lincyang/OnnxOCRSharp
 // </website>
-// <wechat>���ںţ�����ԱLinc</wechat>
+// <wechat>公众号：程序员Linc</wechat>
 //-----------------------------------------------------------------------
 namespace OnnxOcr.Core.Configuration;
 
@@ -21,6 +21,9 @@ public sealed class OcrOptions
 
     public bool UseGpu { get; set; }
     public int GpuId { get; set; }
+    public bool AutoSelectGpu { get; set; } = true;
+    public long GpuMemoryLimitBytes { get; set; } = 0;
+
     public int CpuThreads { get; set; } = 4;
 
     public string DetAlgorithm { get; set; } = "DB";
@@ -75,6 +78,38 @@ public sealed class OcrOptions
 
     public static OcrOptions ForPpOcrV6Medium(string? modelsRoot = null)
         => ForPreset(OcrModelPreset.PpOcrV6Medium, modelsRoot);
+
+    public static OcrOptions ForPresetWithGpu(
+        OcrModelPreset preset,
+        int gpuId = 0,
+        string? modelsRoot = null)
+    {
+        var options = ForPreset(preset, modelsRoot);
+        options.UseGpu = true;
+        options.GpuId = gpuId;
+        options.AutoSelectGpu = false;
+        return options;
+    }
+
+    public static OcrOptions ForPresetWithAutoDevice(
+        OcrModelPreset preset,
+        string? modelsRoot = null)
+    {
+        var options = ForPreset(preset, modelsRoot);
+
+        if (GpuDeviceDetector.IsCudaAvailable())
+        {
+            var recommended = GpuDeviceDetector.GetRecommendedDevice();
+            if (recommended >= 0)
+            {
+                options.UseGpu = true;
+                options.GpuId = recommended;
+                options.AutoSelectGpu = true;
+            }
+        }
+
+        return options;
+    }
 
     public void Validate()
     {

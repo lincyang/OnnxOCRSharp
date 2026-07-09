@@ -49,18 +49,30 @@ public sealed class TextSystem : IDisposable
             throw new ArgumentException("Input image is empty.", nameof(image));
 
         var started = DateTime.UtcNow;
+        OcrLogger.Log($"[TextSystem] ===== OCR Start | Device={(_options.UseGpu ? "GPU" : "CPU")} =====");
+
+        var detStarted = DateTime.UtcNow;
         var boxes = _detector.Detect(image);
+        var detElapsed = DateTime.UtcNow - detStarted;
+        OcrLogger.Log($"[TextSystem] Detection: {boxes.Count} boxes in {detElapsed.TotalMilliseconds:F1}ms");
+
         if (boxes.Count == 0)
         {
+            var total = DateTime.UtcNow - started;
+            OcrLogger.Log($"[TextSystem] No text found. Total: {total.TotalMilliseconds:F1}ms");
             return new OcrResult
             {
-                Elapsed = DateTime.UtcNow - started,
+                Elapsed = total,
                 ImageWidth = image.Cols,
                 ImageHeight = image.Rows,
             };
         }
 
+        var sortStarted = DateTime.UtcNow;
         var sortedBoxes = BoxSorter.Sort(boxes);
+        OcrLogger.Log($"[TextSystem] BoxSort: {(DateTime.UtcNow - sortStarted).TotalMilliseconds:F1}ms");
+
+        var cropStarted = DateTime.UtcNow;
         var crops = new List<Mat>(sortedBoxes.Count);
 
         foreach (var box in sortedBoxes)
@@ -73,7 +85,9 @@ public sealed class TextSystem : IDisposable
 
             if (_orientationClassifier != null)
             {
+                var clsStarted = DateTime.UtcNow;
                 var corrected = _orientationClassifier.CorrectOrientation(crop);
+                OcrLogger.Log($"[TextSystem] Orientation classify: {(DateTime.UtcNow - clsStarted).TotalMilliseconds:F1}ms");
                 if (!ReferenceEquals(corrected, crop))
                 {
                     crop.Dispose();
@@ -83,10 +97,15 @@ public sealed class TextSystem : IDisposable
 
             crops.Add(crop);
         }
+        OcrLogger.Log($"[TextSystem] Crop total: {(DateTime.UtcNow - cropStarted).TotalMilliseconds:F1}ms");
 
         try
         {
+            var recStarted = DateTime.UtcNow;
             var recResults = _recognizer.Recognize(crops);
+            var recElapsed = DateTime.UtcNow - recStarted;
+            OcrLogger.Log($"[TextSystem] Recognition: {recResults.Count} texts in {recElapsed.TotalMilliseconds:F1}ms");
+
             var lines = new List<TextLine>();
 
             for (var i = 0; i < sortedBoxes.Count; i++)
@@ -103,10 +122,13 @@ public sealed class TextSystem : IDisposable
                 });
             }
 
+            var total = DateTime.UtcNow - started;
+            OcrLogger.Log($"[TextSystem] ===== OCR Done | {lines.Count} lines | Total: {total.TotalMilliseconds:F1}ms =====");
+
             return new OcrResult
             {
                 Lines = lines,
-                Elapsed = DateTime.UtcNow - started,
+                Elapsed = total,
                 ImageWidth = image.Cols,
                 ImageHeight = image.Rows,
             };

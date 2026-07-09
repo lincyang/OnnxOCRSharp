@@ -25,12 +25,19 @@ using OpenCvSharp.WpfExtensions;
 
 namespace OnnxOcr.Desktop.ViewModels;
 
+public enum InferenceDevice
+{
+    Cpu,
+    Gpu,
+}
+
 public partial class MainViewModel : ObservableObject, IAsyncDisposable
 {
     private readonly OcrService? _ownedOcrService;
     private OcrService? _ocrService;
     private CancellationTokenSource? _recognizeCts;
     private CancellationTokenSource? _loadModelCts;
+    private bool _suppressModelReload;
 
     public MainViewModel()
         : this(null)
@@ -48,9 +55,37 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
             new(OcrModelPreset.PpOcrV6Small, "PP-OCRv6 Small"),
             new(OcrModelPreset.PpOcrV6Medium, "PP-OCRv6 Medium"),
         };
+
+        GpuDevices = DetectGpuDevices();
+
+        DeviceOptions = new List<DeviceOption> { new(InferenceDevice.Cpu, "CPU") };
+        if (GpuDevices.Count > 0)
+        {
+            DeviceOptions.Add(new(InferenceDevice.Gpu, "GPU"));
+        }
+
+        OcrLogger.OnLog += AppendLog;
+    }
+
+    private void AppendLog(string message)
+    {
+        Application.Current?.Dispatcher?.Invoke(() =>
+        {
+            LogMessages.Insert(0, message);
+            if (LogMessages.Count > 200)
+                LogMessages.RemoveAt(LogMessages.Count - 1);
+        });
     }
 
     public List<PresetOption> PresetOptions { get; }
+    public List<DeviceOption> DeviceOptions { get; }
+    public IReadOnlyList<GpuDeviceInfo> GpuDevices { get; }
+
+    [ObservableProperty]
+    private InferenceDevice _selectedDevice = InferenceDevice.Cpu;
+
+    [ObservableProperty]
+    private GpuDeviceInfo? _selectedGpuDevice;
 
     [ObservableProperty]
     private OcrModelPreset _selectedPreset = OcrModelPreset.PpOcrV6Tiny;
@@ -92,6 +127,7 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
     private bool _isDownloadSupported;
 
     public ObservableCollection<OcrLineViewModel> Lines { get; } = new();
+    public ObservableCollection<string> LogMessages { get; } = new();
 
     public async Task InitializeAsync()
     {
@@ -129,7 +165,7 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
 
             token.ThrowIfCancellationRequested();
 
-            var service = await Task.Run(() => new OcrService(preset), token);
+            var service = await Task.Run(() => CreateOcrService(preset), token);
 
             token.ThrowIfCancellationRequested();
 
@@ -138,7 +174,9 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
 
             _ocrService = service;
             IsReady = true;
-            StatusMessage = "就绪";
+            StatusMessage = SelectedDevice == InferenceDevice.Gpu
+                ? $"就绪 (GPU: {SelectedGpuDevice?.Name ?? "auto"})"
+                : "就绪 (CPU)";
         }
         catch (OperationCanceledException)
         {
@@ -260,7 +298,57 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
 
     partial void OnSelectedPresetChanged(OcrModelPreset value)
     {
+        if (_suppressModelReload) return;
         _ = LoadModelAsync(value);
+    }
+
+    partial void OnSelectedDeviceChanged(InferenceDevice value)
+    {
+        OnPropertyChanged(nameof(IsGpuSelected));
+        if (_suppressModelReload) return;
+        if (value == InferenceDevice.Gpu && SelectedGpuDevice == null && GpuDevices.Count > 0)
+        {
+            _suppressModelReload = true;
+            SelectedGpuDevice = GpuDevices[0];
+            _suppressModelReload = false;
+        }
+        _ = LoadModelAsync(SelectedPreset);
+    }
+
+    partial void OnSelectedGpuDeviceChanged(GpuDeviceInfo? value)
+    {
+        if (_suppressModelReload) return;
+        if (SelectedDevice == InferenceDevice.Gpu)
+            _ = LoadModelAsync(SelectedPreset);
+    }
+
+    public bool IsGpuSelected => SelectedDevice == InferenceDevice.Gpu;
+
+    private OcrService CreateOcrService(OcrModelPreset preset)
+    {
+        if (SelectedDevice == InferenceDevice.Gpu)
+        {
+            if (SelectedGpuDevice != null)
+                return OcrService.CreateWithGpu(preset, SelectedGpuDevice.DeviceId);
+            return OcrService.CreateWithAutoDevice(preset);
+        }
+
+        return new OcrService(preset);
+    }
+
+    private static IReadOnlyList<GpuDeviceInfo> DetectGpuDevices()
+    {
+        try
+        {
+            return GpuDeviceDetector.DetectGpus();
+        }
+        catch
+        {
+            return new List<GpuDeviceInfo>
+            {
+                new() { DeviceId = 0, Name = "GPU 0", IsAvailable = true },
+            };
+        }
     }
 
     [RelayCommand(CanExecute = nameof(CanOpenImage))]
@@ -302,8 +390,11 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
             foreach (var line in result.Lines)
                 Lines.Add(OcrLineViewModel.From(line));
 
-            ElapsedText = $"耗时: {result.Elapsed.TotalSeconds:F2}s，共 {result.Lines.Count} 行";
-            StatusMessage = result.Lines.Count > 0 ? "识别完成" : "未检测到文字";
+            var deviceTag = SelectedDevice == InferenceDevice.Gpu
+                ? $"[GPU:{SelectedGpuDevice?.Name ?? "auto"}]"
+                : "[CPU]";
+            ElapsedText = $"{deviceTag} 耗时: {result.Elapsed.TotalSeconds:F2}s，共 {result.Lines.Count} 行";
+            StatusMessage = result.Lines.Count > 0 ? $"识别完成 {deviceTag}" : $"未检测到文字 {deviceTag}";
         }
         catch (OperationCanceledException)
         {
@@ -436,6 +527,8 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        OcrLogger.OnLog -= AppendLog;
+
         _loadModelCts?.Cancel();
         _loadModelCts?.Dispose();
         _recognizeCts?.Cancel();
@@ -458,6 +551,18 @@ public class PresetOption
     public PresetOption(OcrModelPreset preset, string displayName)
     {
         Preset = preset;
+        DisplayName = displayName;
+    }
+}
+
+public class DeviceOption
+{
+    public InferenceDevice Device { get; }
+    public string DisplayName { get; }
+
+    public DeviceOption(InferenceDevice device, string displayName)
+    {
+        Device = device;
         DisplayName = displayName;
     }
 }

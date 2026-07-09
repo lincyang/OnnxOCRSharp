@@ -29,6 +29,18 @@ public sealed class OcrService : IDisposable
         _textSystem = new TextSystem(options ?? OcrOptions.CreateDefault());
     }
 
+    public static OcrService CreateWithGpu(OcrModelPreset preset, int gpuId = 0, string? modelsRoot = null)
+    {
+        var options = OcrOptions.ForPresetWithGpu(preset, gpuId, modelsRoot);
+        return new OcrService(options);
+    }
+
+    public static OcrService CreateWithAutoDevice(OcrModelPreset preset, string? modelsRoot = null)
+    {
+        var options = OcrOptions.ForPresetWithAutoDevice(preset, modelsRoot);
+        return new OcrService(options);
+    }
+
     public Task<OcrRunResult> RecognizeAsync(string imagePath, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(imagePath))

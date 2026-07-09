@@ -13,7 +13,7 @@ using OnnxOcr.Core.Pipeline;
 using OpenCvSharp;
 using System.Text;
 
-if (!TryParseArguments(args, out var preset, out var modelsRoot, out var imagePath))
+if (!TryParseArguments(args, out var preset, out var modelsRoot, out var useGpu, out var gpuId, out var autoGpu, out var imagePath))
 {
     PrintUsage();
     return 1;
@@ -34,12 +34,36 @@ if (image.Empty())
 }
 
 var options = OcrOptions.ForPreset(preset, modelsRoot);
+
+// Apply GPU settings
+options.UseGpu = useGpu;
+if (useGpu)
+{
+    options.AutoSelectGpu = autoGpu;
+    if (!autoGpu)
+    {
+        options.GpuId = gpuId;
+    }
+}
+
 Console.OutputEncoding = Encoding.UTF8;
 Console.WriteLine("OnnxOCR C# Console");
 Console.WriteLine($"Preset    : {preset}");
 Console.WriteLine($"Det model : {options.DetModelPath}");
 Console.WriteLine($"Rec model : {options.RecModelPath}");
 Console.WriteLine($"Dict      : {options.DictPath}");
+Console.WriteLine($"Device    : {(options.UseGpu ? "GPU" : "CPU")}");
+if (options.UseGpu)
+{
+    if (options.AutoSelectGpu)
+    {
+        Console.WriteLine($"GPU mode  : Auto-select");
+    }
+    else
+    {
+        Console.WriteLine($"GPU ID    : {options.GpuId}");
+    }
+}
 Console.WriteLine($"Image     : {imagePath} ({image.Cols}x{image.Rows})");
 Console.WriteLine();
 
@@ -62,10 +86,16 @@ static bool TryParseArguments(
     string[] args,
     out OcrModelPreset preset,
     out string? modelsRoot,
+    out bool useGpu,
+    out int gpuId,
+    out bool autoGpu,
     out string imagePath)
 {
     preset = OcrModelPreset.PpOcrV6Tiny;
     modelsRoot = null;
+    useGpu = false;
+    gpuId = 0;
+    autoGpu = true;
     imagePath = "";
 
     var index = 0;
@@ -87,6 +117,24 @@ static bool TryParseArguments(
                 return false;
 
             modelsRoot = Path.GetFullPath(args[index]);
+            index++;
+            continue;
+        }
+
+        if (arg is "--gpu" or "-g")
+        {
+            useGpu = true;
+            index++;
+            continue;
+        }
+
+        if (arg is "--gpu-id")
+        {
+            if (++index >= args.Length || !int.TryParse(args[index], out gpuId) || gpuId < 0)
+                return false;
+
+            useGpu = true;
+            autoGpu = false;
             index++;
             continue;
         }
@@ -133,8 +181,12 @@ static void PrintUsage()
     Console.WriteLine("Options:");
     Console.WriteLine("  --preset, -p <name>   v5 | v6 | v6-tiny | v6-small | v6-medium");
     Console.WriteLine("  --models, -m <dir>    models root directory (contains ppocrv5/ or ppocrv6/)");
+    Console.WriteLine("  --gpu, -g             use GPU for inference (auto-select device)");
+    Console.WriteLine("  --gpu-id <id>         use specific GPU device ID");
     Console.WriteLine();
     Console.WriteLine("Examples:");
     Console.WriteLine("  dotnet run --project src/OnnxOcr.Console -- test_assets/sample.jpg");
     Console.WriteLine("  dotnet run --project src/OnnxOcr.Console -- --preset v6 test_assets/sample.jpg");
+    Console.WriteLine("  dotnet run --project src/OnnxOcr.Console -- --gpu test_assets/sample.jpg");
+    Console.WriteLine("  dotnet run --project src/OnnxOcr.Console -- --gpu-id 0 test_assets/sample.jpg");
 }
