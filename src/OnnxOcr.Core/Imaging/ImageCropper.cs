@@ -14,6 +14,18 @@ namespace OnnxOcr.Core.Imaging;
 
 internal static class ImageCropper
 {
+    private const double VerticalAspectRatioThreshold = 1.5;
+
+    public static bool IsVerticalBox(Point2f[] points)
+    {
+        if (points.Length != 4)
+            return false;
+
+        var cropWidth = Math.Max(Distance(points[0], points[1]), Distance(points[2], points[3]));
+        var cropHeight = Math.Max(Distance(points[0], points[3]), Distance(points[1], points[2]));
+        return cropHeight / Math.Max(cropWidth, 1f) >= VerticalAspectRatioThreshold;
+    }
+
     public static Mat Crop(Mat image, Point2f[] points, string boxType, bool applyVerticalRotate = true)
     {
         return boxType == "quad"
@@ -48,7 +60,7 @@ internal static class ImageCropper
             InterpolationFlags.Cubic,
             BorderTypes.Replicate);
 
-        if (applyVerticalRotate && cropped.Rows * 1.0 / cropped.Cols >= 1.5)
+        if (applyVerticalRotate && cropped.Rows * 1.0 / cropped.Cols >= VerticalAspectRatioThreshold)
         {
             using (cropped)
             {

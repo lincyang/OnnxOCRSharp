@@ -44,7 +44,11 @@ public sealed class TextDetector : IDisposable
 
     public IReadOnlyList<Point2f[]> Detect(Mat image)
     {
-        var (inputTensor, shape) = DetPreprocessor.Prepare(image, _options.DetLimitSideLen, _options.DetLimitType);
+        var (inputTensor, shape) = DetPreprocessor.Prepare(
+            image,
+            _options.DetLimitSideLen,
+            _options.DetLimitType,
+            _options.DetMaxSideLimit);
         var channels = inputTensor.GetLength(0);
         var height = inputTensor.GetLength(1);
         var width = inputTensor.GetLength(2);

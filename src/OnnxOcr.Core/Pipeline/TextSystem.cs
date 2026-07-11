@@ -35,7 +35,7 @@ public sealed class TextSystem : IDisposable
         _detector = new Detection.TextDetector(options, sessionFactory);
         _recognizer = new TextRecognizer(options, sessionFactory);
 
-        if (options.UseAngleCls
+        if (options.TextOrientationMode != TextOrientationMode.None
             && !string.IsNullOrWhiteSpace(options.OrientationModelPath)
             && File.Exists(options.OrientationModelPath))
         {
@@ -77,13 +77,14 @@ public sealed class TextSystem : IDisposable
 
         foreach (var box in sortedBoxes)
         {
+            var useClassifier = ShouldUseOrientationClassifier(box);
             var crop = ImageCropper.Crop(
                 image,
                 box,
                 _options.DetBoxType,
-                applyVerticalRotate: _orientationClassifier == null);
+                applyVerticalRotate: !useClassifier);
 
-            if (_orientationClassifier != null)
+            if (useClassifier && _orientationClassifier != null)
             {
                 var clsStarted = DateTime.UtcNow;
                 var corrected = _orientationClassifier.CorrectOrientation(crop);
@@ -139,6 +140,14 @@ public sealed class TextSystem : IDisposable
                 crop.Dispose();
         }
     }
+
+    private bool ShouldUseOrientationClassifier(Point2f[] box)
+        => _orientationClassifier != null && _options.TextOrientationMode switch
+        {
+            TextOrientationMode.Always => true,
+            TextOrientationMode.Auto => ImageCropper.IsVerticalBox(box),
+            _ => false,
+        };
 
     public void Dispose()
     {

@@ -29,6 +29,7 @@ public sealed class OcrOptions
     public string DetAlgorithm { get; set; } = "DB";
     public float DetLimitSideLen { get; set; } = 960f;
     public string DetLimitType { get; set; } = "max";
+    public float DetMaxSideLimit { get; set; } = 4000f;
     public string DetBoxType { get; set; } = "quad";
     public float DetDbThresh { get; set; } = 0.3f;
     public float DetDbBoxThresh { get; set; } = 0.6f;
@@ -43,7 +44,13 @@ public sealed class OcrOptions
     public bool UseSpaceChar { get; set; } = true;
     public float DropScore { get; set; } = 0.5f;
 
-    public bool UseAngleCls { get; set; }
+    public TextOrientationMode TextOrientationMode { get; set; } = TextOrientationMode.None;
+
+    public bool UseAngleCls
+    {
+        get => TextOrientationMode != TextOrientationMode.None;
+        set => TextOrientationMode = value ? TextOrientationMode.Always : TextOrientationMode.None;
+    }
 
     public static OcrOptions CreateDefault() => ForPreset(OcrModelPreset.PpOcrV6Tiny);
 

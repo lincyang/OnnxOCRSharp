@@ -14,6 +14,10 @@ namespace OnnxOcr.Core.Configuration;
 
 internal static class InferenceYamlProfile
 {
+    private const float DefaultDetLimitSideLen = 736f;
+    private const string DefaultDetLimitType = "min";
+    private const float DefaultDetMaxSideLimit = 4000f;
+
     public static void Apply(OcrOptions options)
     {
         ApplyDetectionProfile(options);
@@ -26,6 +30,8 @@ internal static class InferenceYamlProfile
         if (!File.Exists(ymlPath))
             return;
 
+        ApplyDetResizeForTest(options, ymlPath);
+
         var values = ReadScalarMap(ymlPath, "PostProcess:");
         if (values.TryGetValue("thresh", out var thresh))
             options.DetDbThresh = thresh;
@@ -35,6 +41,119 @@ internal static class InferenceYamlProfile
             options.DetDbUnclipRatio = unclipRatio;
         if (values.TryGetValue("max_candidates", out var maxCandidates))
             options.DetDbMaxCandidates = (int)maxCandidates;
+    }
+
+    private static void ApplyDetResizeForTest(OcrOptions options, string ymlPath)
+    {
+        var resize = ReadDetResizeForTest(ymlPath);
+        if (resize == null)
+            return;
+
+        if (resize.LimitSideLen.HasValue)
+            options.DetLimitSideLen = resize.LimitSideLen.Value;
+        if (!string.IsNullOrWhiteSpace(resize.LimitType))
+            options.DetLimitType = resize.LimitType;
+        if (resize.MaxSideLimit.HasValue)
+            options.DetMaxSideLimit = resize.MaxSideLimit.Value;
+    }
+
+    private static DetResizeForTestConfig? ReadDetResizeForTest(string ymlPath)
+    {
+        var lines = File.ReadAllLines(ymlPath);
+        var inPreProcess = false;
+        var inDetResize = false;
+        float? limitSideLen = null;
+        string? limitType = null;
+        float? resizeLong = null;
+        float? maxSideLimit = null;
+
+        foreach (var rawLine in lines)
+        {
+            var line = rawLine.TrimEnd();
+            var trimmed = line.Trim();
+
+            if (trimmed == "PreProcess:")
+            {
+                inPreProcess = true;
+                inDetResize = false;
+                continue;
+            }
+
+            if (!inPreProcess)
+                continue;
+
+            if (trimmed.StartsWith("- DetResizeForTest:", StringComparison.Ordinal))
+            {
+                inDetResize = true;
+                var value = trimmed["- DetResizeForTest:".Length..].Trim();
+                if (value.Equals("null", StringComparison.OrdinalIgnoreCase))
+                {
+                    return new DetResizeForTestConfig(
+                        DefaultDetLimitSideLen,
+                        DefaultDetLimitType,
+                        null,
+                        DefaultDetMaxSideLimit);
+                }
+
+                continue;
+            }
+
+            if (inDetResize)
+            {
+                if (trimmed.StartsWith("- ", StringComparison.Ordinal))
+                    break;
+
+                var colonIndex = trimmed.IndexOf(':');
+                if (colonIndex <= 0)
+                    continue;
+
+                var key = trimmed[..colonIndex].Trim();
+                var valueText = trimmed[(colonIndex + 1)..].Trim();
+                switch (key)
+                {
+                    case "limit_side_len":
+                        if (float.TryParse(valueText, NumberStyles.Float, CultureInfo.InvariantCulture, out var sideLen))
+                            limitSideLen = sideLen;
+                        break;
+                    case "limit_type":
+                        limitType = valueText.Trim('"', '\'');
+                        break;
+                    case "resize_long":
+                        if (float.TryParse(valueText, NumberStyles.Float, CultureInfo.InvariantCulture, out var longSide))
+                            resizeLong = longSide;
+                        break;
+                    case "max_side_limit":
+                        if (float.TryParse(valueText, NumberStyles.Float, CultureInfo.InvariantCulture, out var sideLimit))
+                            maxSideLimit = sideLimit;
+                        break;
+                }
+
+                continue;
+            }
+
+            if (trimmed.StartsWith("- ", StringComparison.Ordinal))
+                inDetResize = false;
+        }
+
+        if (limitSideLen.HasValue || !string.IsNullOrWhiteSpace(limitType) || resizeLong.HasValue || maxSideLimit.HasValue)
+        {
+            if (resizeLong.HasValue)
+            {
+                return new DetResizeForTestConfig(
+                    resizeLong.Value,
+                    "resize_long",
+                    resizeLong,
+                    maxSideLimit ?? DefaultDetMaxSideLimit);
+            }
+
+            return new DetResizeForTestConfig(
+                limitSideLen ?? DefaultDetLimitSideLen,
+                limitType ?? DefaultDetLimitType,
+                resizeLong,
+                maxSideLimit ?? DefaultDetMaxSideLimit);
+        }
+
+        return null;
     }
 
     private static void ApplyRecognitionProfile(OcrOptions options)
@@ -137,4 +256,10 @@ internal static class InferenceYamlProfile
 
         return values;
     }
+
+    private sealed record DetResizeForTestConfig(
+        float? LimitSideLen,
+        string? LimitType,
+        float? ResizeLong,
+        float? MaxSideLimit);
 }

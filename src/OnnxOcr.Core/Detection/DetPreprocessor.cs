@@ -14,7 +14,11 @@ namespace OnnxOcr.Core.Detection;
 
 internal static class DetPreprocessor
 {
-    public static (float[,,] Image, DetShapeInfo Shape) Prepare(Mat source, float limitSideLen, string limitType)
+    public static (float[,,] Image, DetShapeInfo Shape) Prepare(
+        Mat source,
+        float limitSideLen,
+        string limitType,
+        float maxSideLimit = 4000f)
     {
         var ownsWorkingImage = false;
         var working = source;
@@ -24,7 +28,7 @@ internal static class DetPreprocessor
             ownsWorkingImage = true;
         }
 
-        var (resized, ratioH, ratioW) = ResizeImageType0(working, limitSideLen, limitType);
+        var (resized, ratioH, ratioW) = ResizeImageType0(working, limitSideLen, limitType, maxSideLimit);
         if (ownsWorkingImage)
             working.Dispose();
 
@@ -43,7 +47,11 @@ internal static class DetPreprocessor
         return padded;
     }
 
-    private static (Mat Image, float RatioH, float RatioW) ResizeImageType0(Mat image, float limitSideLen, string limitType)
+    private static (Mat Image, float RatioH, float RatioW) ResizeImageType0(
+        Mat image,
+        float limitSideLen,
+        string limitType,
+        float maxSideLimit)
     {
         var height = image.Rows;
         var width = image.Cols;
@@ -52,12 +60,12 @@ internal static class DetPreprocessor
         if (limitType == "max")
         {
             if (Math.Max(height, width) > limitSideLen)
-                ratio = height > width ? limitSideLen / height : limitSideLen / width;
+                ratio = limitSideLen / Math.Max(height, width);
         }
         else if (limitType == "min")
         {
             if (Math.Min(height, width) < limitSideLen)
-                ratio = height < width ? limitSideLen / height : limitSideLen / width;
+                ratio = limitSideLen / Math.Min(height, width);
         }
         else if (limitType == "resize_long")
         {
@@ -68,8 +76,18 @@ internal static class DetPreprocessor
             throw new ArgumentException($"Unsupported limit type: {limitType}", nameof(limitType));
         }
 
-        var resizeH = AlignTo32(Math.Max((int)Math.Round(height * ratio), 32));
-        var resizeW = AlignTo32(Math.Max((int)Math.Round(width * ratio), 32));
+        var resizeH = Math.Max((int)Math.Round(height * ratio), 32);
+        var resizeW = Math.Max((int)Math.Round(width * ratio), 32);
+        if (maxSideLimit > 0 && Math.Max(resizeH, resizeW) > maxSideLimit)
+        {
+            var capRatio = maxSideLimit / Math.Max(resizeH, resizeW);
+            resizeH = Math.Max((int)Math.Round(resizeH * capRatio), 32);
+            resizeW = Math.Max((int)Math.Round(resizeW * capRatio), 32);
+            ratio *= capRatio;
+        }
+
+        resizeH = AlignTo32(resizeH);
+        resizeW = AlignTo32(resizeW);
 
         var resized = new Mat();
         Cv2.Resize(image, resized, new Size(resizeW, resizeH));

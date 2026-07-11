@@ -19,8 +19,9 @@ internal static class OcrModelProfiles
         options.RecModelPath = ModelPathResolver.ResolveRecModelPath(preset, modelsRoot);
         options.DictPath = ModelPathResolver.ResolveRecDictionaryPath(options.RecModelPath);
         options.OrientationModelPath = ModelPathResolver.FindOrientationModelPath(modelsRoot);
-        options.UseAngleCls = !string.IsNullOrWhiteSpace(options.OrientationModelPath)
-            && File.Exists(options.OrientationModelPath);
+        options.TextOrientationMode = File.Exists(options.OrientationModelPath)
+            ? TextOrientationMode.Auto
+            : TextOrientationMode.None;
 
         switch (preset)
         {
@@ -50,6 +51,9 @@ internal static class OcrModelProfiles
 
     private static void ApplyPpOcrV6Defaults(OcrOptions options)
     {
+        options.DetLimitSideLen = 736f;
+        options.DetLimitType = "min";
+        options.DetMaxSideLimit = 4000f;
         options.DetDbThresh = 0.2f;
         options.DetDbBoxThresh = 0.4f;
         options.DetDbUnclipRatio = 1.4f;

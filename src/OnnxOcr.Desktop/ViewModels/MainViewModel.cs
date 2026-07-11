@@ -64,17 +64,6 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
             DeviceOptions.Add(new(InferenceDevice.Gpu, "GPU"));
         }
 
-        OcrLogger.OnLog += AppendLog;
-    }
-
-    private void AppendLog(string message)
-    {
-        Application.Current?.Dispatcher?.Invoke(() =>
-        {
-            LogMessages.Insert(0, message);
-            if (LogMessages.Count > 200)
-                LogMessages.RemoveAt(LogMessages.Count - 1);
-        });
     }
 
     public List<PresetOption> PresetOptions { get; }
@@ -127,7 +116,6 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
     private bool _isDownloadSupported;
 
     public ObservableCollection<OcrLineViewModel> Lines { get; } = new();
-    public ObservableCollection<string> LogMessages { get; } = new();
 
     public async Task InitializeAsync()
     {
@@ -527,8 +515,6 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
-        OcrLogger.OnLog -= AppendLog;
-
         _loadModelCts?.Cancel();
         _loadModelCts?.Dispose();
         _recognizeCts?.Cancel();
