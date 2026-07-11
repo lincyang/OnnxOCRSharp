@@ -11,6 +11,7 @@
 using Microsoft.ML.OnnxRuntime;
 using Microsoft.ML.OnnxRuntime.Tensors;
 using OnnxOcr.Core.Configuration;
+using OnnxOcr.Core.Imaging;
 using OnnxOcr.Core.Inference;
 using OpenCvSharp;
 
@@ -86,7 +87,7 @@ public sealed class TextDetector : IDisposable
             filtered.Add(clipped);
         }
 
-        return filtered;
+        return BoxOverlapFilter.RemoveNestedBoxes(filtered);
     }
 
     private static Point2f[] OrderPointsClockwise(Point2f[] points)
