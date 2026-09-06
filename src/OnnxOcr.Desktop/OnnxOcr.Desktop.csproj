@@ -17,6 +17,18 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
+    <Version>0.2.0</Version>
+    <InformationalVersion>0.2.0</InformationalVersion>
+    <Product>OnnxOCRSharp Desktop</Product>
+    <Company>程序员Linc</Company>
+    <Authors>程序员Linc</Authors>
+    <ApplicationIcon>Assets\app.ico</ApplicationIcon>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\wechat-qrcode.jpg" />
+    <Resource Include="Assets\miniprogram-table-ocr-qrcode.jpg" />
+    <Resource Include="Assets\app.ico" />
+  </ItemGroup>
 
 </Project>

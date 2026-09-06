@@ -60,5 +60,69 @@ public sealed class OcrService : IDisposable
         }, cancellationToken);
     }
 
+    /// <summary>
+    /// 按顺序串行识别多张图片。单张失败会记录错误并继续，不会中断整批。
+    /// </summary>
+    public async Task<IReadOnlyList<OcrBatchItemResult>> RecognizeManyAsync(
+        IEnumerable<string> imagePaths,
+        IProgress<OcrBatchProgress>? progress = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(imagePaths);
+
+        var paths = imagePaths
+            .Where(p => !string.IsNullOrWhiteSpace(p))
+            .Select(p => p.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var results = new List<OcrBatchItemResult>(paths.Count);
+        var succeeded = 0;
+        var failed = 0;
+
+        for (var i = 0; i < paths.Count; i++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var path = paths[i];
+            progress?.Report(new OcrBatchProgress
+            {
+                CurrentIndex = i + 1,
+                Total = paths.Count,
+                CurrentPath = path,
+                Succeeded = succeeded,
+                Failed = failed,
+            });
+
+            try
+            {
+                var run = await RecognizeAsync(path, cancellationToken).ConfigureAwait(false);
+                succeeded++;
+                results.Add(new OcrBatchItemResult
+                {
+                    ImagePath = path,
+                    Success = true,
+                    Result = run,
+                });
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                failed++;
+                results.Add(new OcrBatchItemResult
+                {
+                    ImagePath = path,
+                    Success = false,
+                    ErrorMessage = ex.Message,
+                });
+            }
+        }
+
+        return results;
+    }
+
     public void Dispose() => _textSystem.Dispose();
 }

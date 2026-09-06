@@ -39,7 +39,7 @@ OnnxOCRSharp/
    - Command-line testing can still use **`OnnxOcr.Console`**
 3. Press **F5** to run
 
-UI Features: Select image → Start recognition → Preview with detection boxes on the left → Results list on the right → Copy all.
+UI Features: Add files/folder (multi-select + drag-drop) → Batch recognize → Queue / preview with boxes / results → Copy current or all → Export.
 
 ### Visual Studio 2022 (Console)
 
@@ -175,4 +175,12 @@ Apache License Version 2.0
 ## Contact
 
 - GitHub: https://github.com/lincyang/OnnxOCRSharp
-- WeChat Official Account: 程序员Linc
+- WeChat Official Account: **程序员Linc**
+
+Scan the QR code below to follow:
+
+<p align="center">
+  <img src="assets/wechat-qrcode.jpg" alt="WeChat Official Account: 程序员Linc" width="240" />
+  <br/>
+  <sub>WeChat · 程序员Linc</sub>
+</p>

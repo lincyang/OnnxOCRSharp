@@ -39,7 +39,7 @@ OnnxOCRSharp/
    - 命令行测试仍可用 **`OnnxOcr.Console`**
 3. 按 **F5** 运行
 
-界面功能：选择图片 → 开始识别 → 左侧预览与检测框 → 右侧结果列表 → 复制全部。
+界面功能：添加文件/文件夹（支持多选与拖拽）→ 开始批量识别 → 左队列 / 中预览与检测框 / 右结果 → 复制当前/全部 → 导出。
 
 ### Visual Studio 2022（Console）
 
@@ -175,6 +175,12 @@ await downloadService.DownloadPresetModelsAsync(
 ## 联系方式
 
 - GitHub: https://github.com/lincyang/OnnxOCRSharp
-- 微信公众号: 程序员Linc
+- 微信公众号: **程序员Linc**
 
 欢迎关注公众号获取更多技术文章和项目更新！
+
+<p align="center">
+  <img src="assets/wechat-qrcode.jpg" alt="微信公众号：程序员Linc" width="240" />
+  <br/>
+  <sub>微信扫码关注「程序员Linc」</sub>
+</p>

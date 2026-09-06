@@ -36,4 +36,30 @@ public partial class MainWindow : Window
     {
         await _viewModel.DisposeAsync();
     }
+
+    private void OnDragOver(object sender, DragEventArgs e)
+    {
+        e.Effects = e.Data.GetDataPresent(DataFormats.FileDrop)
+            ? DragDropEffects.Copy
+            : DragDropEffects.None;
+        e.Handled = true;
+    }
+
+    private void OnDrop(object sender, DragEventArgs e)
+    {
+        if (!e.Data.GetDataPresent(DataFormats.FileDrop))
+            return;
+
+        if (e.Data.GetData(DataFormats.FileDrop) is not string[] paths || paths.Length == 0)
+            return;
+
+        _viewModel.AddDroppedPaths(paths);
+        e.Handled = true;
+    }
+
+    private void OnWeChatPromoClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        if (_viewModel.ShowAboutCommand.CanExecute(null))
+            _viewModel.ShowAboutCommand.Execute(null);
+    }
 }

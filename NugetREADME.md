@@ -10,6 +10,7 @@
 - **自动路径解析**：智能查找模型文件，支持 ModelScope 原样解压目录
 - **模型下载**：内置魔塔（ModelScope）模型下载服务，一键获取模型
 - **简单易用**：几行代码即可完成 OCR 识别
+- **批量识别**：`RecognizeManyAsync` 串行处理多图，支持进度回调
 
 ## 安装
 
@@ -48,6 +49,30 @@ foreach (var line in result.Lines)
 
 Console.WriteLine($"图片尺寸: {result.ImageWidth}x{result.ImageHeight}");
 Console.WriteLine($"识别耗时: {result.Elapsed.TotalMilliseconds:F0}ms");
+```
+
+### 批量识别多张图片
+
+```csharp
+var paths = new[] { "a.jpg", "b.png", "c.webp" };
+var progress = new Progress<OcrBatchProgress>(p =>
+    Console.WriteLine($"[{p.CurrentIndex}/{p.Total}] {Path.GetFileName(p.CurrentPath)}"));
+
+IReadOnlyList<OcrBatchItemResult> batch =
+    await service.RecognizeManyAsync(paths, progress);
+
+foreach (var item in batch)
+{
+    if (!item.Success)
+    {
+        Console.WriteLine($"失败: {item.ImagePath} -> {item.ErrorMessage}");
+        continue;
+    }
+
+    Console.WriteLine($"===== {Path.GetFileName(item.ImagePath)} =====");
+    foreach (var line in item.Result!.Lines)
+        Console.WriteLine(line.Text);
+}
 ```
 
 > **提示**：`OcrModelPreset` 支持 `PpOcrV6Tiny`（推荐，轻量快速）、`PpOcrV6Small`、`PpOcrV6Medium`（高精度）。
@@ -186,7 +211,13 @@ Apache License Version 2.0
 ## 更多信息
 
 - GitHub 仓库：https://github.com/lincyang/OnnxOCRSharp
-- 微信公众号：程序员Linc
+- 微信公众号：**程序员Linc**
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/lincyang/OnnxOCRSharp/main/assets/wechat-qrcode.jpg" alt="微信公众号：程序员Linc" width="240" />
+  <br/>
+  <sub>微信扫码关注「程序员Linc」</sub>
+</p>
 
 ---
 
