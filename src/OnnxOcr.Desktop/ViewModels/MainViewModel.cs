@@ -73,6 +73,18 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
         {
             DeviceOptions.Add(new(InferenceDevice.Gpu, "GPU"));
         }
+
+        RestoreUserPreferences();
+    }
+
+    private void RestoreUserPreferences()
+    {
+        var settings = UserSettings.Load();
+        var preset = settings.GetPresetOrDefault();
+
+        _suppressModelReload = true;
+        SelectedPreset = preset;
+        _suppressModelReload = false;
     }
 
     public List<PresetOption> PresetOptions { get; }
@@ -309,6 +321,7 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
     partial void OnSelectedPresetChanged(OcrModelPreset value)
     {
         if (_suppressModelReload) return;
+        UserSettings.SavePreset(value);
         _ = LoadModelAsync(value);
     }
 

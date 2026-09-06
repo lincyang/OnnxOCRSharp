@@ -19,7 +19,12 @@ namespace OnnxOcr.Desktop.Controls;
 
 public partial class ImageCanvas : UserControl
 {
+    private const double MinZoom = 0.05;
+    private const double MaxZoom = 8.0;
+    private const double FitPadding = 20;
+
     private double _zoom = 1.0;
+    private bool _userAdjustedZoom;
 
     public static readonly DependencyProperty PreviewImageProperty =
         DependencyProperty.Register(nameof(PreviewImage), typeof(ImageSource), typeof(ImageCanvas),
@@ -32,6 +37,16 @@ public partial class ImageCanvas : UserControl
     public ImageCanvas()
     {
         InitializeComponent();
+        SizeChanged += (_, _) =>
+        {
+            if (!_userAdjustedZoom)
+                FitToView();
+        };
+        Loaded += (_, _) =>
+        {
+            if (!_userAdjustedZoom)
+                FitToView();
+        };
     }
 
     public ImageSource? PreviewImage
@@ -50,8 +65,9 @@ public partial class ImageCanvas : UserControl
     {
         if (d is ImageCanvas canvas)
         {
+            canvas._userAdjustedZoom = false;
             canvas.UpdateLayoutSize();
-            canvas.ResetZoom();
+            canvas.Dispatcher.BeginInvoke(canvas.FitToView, System.Windows.Threading.DispatcherPriority.Loaded);
         }
     }
 
@@ -89,14 +105,41 @@ public partial class ImageCanvas : UserControl
             return;
 
         var delta = e.Delta > 0 ? 0.1 : -0.1;
-        _zoom = Math.Clamp(_zoom + delta, 0.2, 5.0);
+        _zoom = Math.Clamp(_zoom + delta, MinZoom, MaxZoom);
+        _userAdjustedZoom = true;
         ApplyZoom();
         e.Handled = true;
     }
 
-    private void ResetZoom()
+    private void FitToView()
     {
-        _zoom = 1.0;
+        if (PreviewImage is not BitmapSource bitmap || bitmap.PixelWidth <= 0 || bitmap.PixelHeight <= 0)
+        {
+            _zoom = 1.0;
+            ApplyZoom();
+            return;
+        }
+
+        var viewportWidth = ScrollHost.ViewportWidth;
+        var viewportHeight = ScrollHost.ViewportHeight;
+
+        if (viewportWidth <= 1 || viewportHeight <= 1)
+        {
+            viewportWidth = ActualWidth;
+            viewportHeight = ActualHeight;
+        }
+
+        if (viewportWidth <= 1 || viewportHeight <= 1)
+        {
+            _zoom = 1.0;
+            ApplyZoom();
+            return;
+        }
+
+        var availableWidth = Math.Max(1, viewportWidth - FitPadding);
+        var availableHeight = Math.Max(1, viewportHeight - FitPadding);
+        var scale = Math.Min(availableWidth / bitmap.PixelWidth, availableHeight / bitmap.PixelHeight);
+        _zoom = Math.Clamp(scale, MinZoom, MaxZoom);
         ApplyZoom();
     }
 

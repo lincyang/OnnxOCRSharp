@@ -6,8 +6,9 @@
     <ScrollViewer x:Name="ScrollHost"
                   HorizontalScrollBarVisibility="Auto"
                   VerticalScrollBarVisibility="Auto"
-                  PreviewMouseWheel="ScrollHost_OnPreviewMouseWheel">
-        <!-- 单一 Canvas，尺寸与图片像素 1:1，检测框坐标直接对应 -->
+                  PreviewMouseWheel="ScrollHost_OnPreviewMouseWheel"
+                  CanContentScroll="False">
+        <!-- 单一 Canvas，尺寸与图片像素 1:1，检测框坐标直接对应；缩放由 LayoutTransform 控制 -->
         <Canvas x:Name="RootCanvas">
             <Image x:Name="ImageHost"
                    Canvas.Left="0"
