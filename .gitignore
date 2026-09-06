@@ -67,8 +67,9 @@ _ReSharper*/
 
 # =========================
 # ONNX / OCR 本地模型（模型复用 sibling OnnxOCR，勿提交大文件）
+# 只忽略仓库根目录 models/，不要误伤 src/**/Models/ 源码目录
 # =========================
-models/
+/models/
 # *.onnx
 !**/docs/**/*.onnx
 
