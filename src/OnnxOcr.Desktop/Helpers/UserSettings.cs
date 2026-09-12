@@ -24,7 +24,7 @@ internal sealed class UserSettings
     public string SelectedPreset { get; set; } = nameof(OcrModelPreset.PpOcrV6Tiny);
 
     private static string SettingsDirectory =>
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "OnnxOCRSharp");
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "LincOCR");
 
     private static string SettingsPath => Path.Combine(SettingsDirectory, "settings.json");
 

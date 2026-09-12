@@ -25,9 +25,6 @@ internal static class OcrModelProfiles
 
         switch (preset)
         {
-            case OcrModelPreset.PpOcrV5:
-                ApplyPpOcrV5Defaults(options);
-                break;
             case OcrModelPreset.PpOcrV6Tiny:
             case OcrModelPreset.PpOcrV6Small:
             case OcrModelPreset.PpOcrV6Medium:
@@ -37,16 +34,6 @@ internal static class OcrModelProfiles
             default:
                 throw new ArgumentOutOfRangeException(nameof(preset), preset, "Unsupported model preset.");
         }
-    }
-
-    private static void ApplyPpOcrV5Defaults(OcrOptions options)
-    {
-        options.DetDbThresh = 0.3f;
-        options.DetDbBoxThresh = 0.6f;
-        options.DetDbUnclipRatio = 1.5f;
-        options.DetDbMaxCandidates = 1000;
-        options.RecImageShape = "3,48,320";
-        options.UseSpaceChar = true;
     }
 
     private static void ApplyPpOcrV6Defaults(OcrOptions options)

@@ -17,9 +17,10 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
-    <Version>0.2.0</Version>
-    <InformationalVersion>0.2.0</InformationalVersion>
-    <Product>OnnxOCRSharp Desktop</Product>
+    <Version>0.3.0</Version>
+    <InformationalVersion>0.3.0</InformationalVersion>
+    <Product>LincOCR</Product>
+    <AssemblyName>LincOCR</AssemblyName>
     <Company>程序员Linc</Company>
     <Authors>程序员Linc</Authors>
     <ApplicationIcon>Assets\app.ico</ApplicationIcon>

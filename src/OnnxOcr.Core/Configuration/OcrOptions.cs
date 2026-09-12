@@ -74,9 +74,6 @@ public sealed class OcrOptions
         return options;
     }
 
-    public static OcrOptions ForPpOcrV5(string? modelsRoot = null)
-        => ForPreset(OcrModelPreset.PpOcrV5, modelsRoot);
-
     public static OcrOptions ForPpOcrV6Tiny(string? modelsRoot = null)
         => ForPreset(OcrModelPreset.PpOcrV6Tiny, modelsRoot);
 

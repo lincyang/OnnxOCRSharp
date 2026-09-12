@@ -21,6 +21,10 @@ public class ModelDownloadService : IDisposable
     private const string OrientationModelsZipUrl =
         "https://github.com/RapidAI/RapidOrientation/releases/download/v0.0.0/rapid_orientation_models_v2.zip";
     private const string OrientationModelFileName = "rapid_orientation.onnx";
+    private const string TableModelFileName = "slanet-plus.onnx";
+    /// <summary>RapidAI RapidTable SLANet-plus (from OnnxOCR rapid_table/default_models.yaml).</summary>
+    private const string TableModelUrl =
+        "https://www.modelscope.cn/models/RapidAI/RapidTable/resolve/v2.0.0/slanet-plus.onnx";
 
     public event Action<string>? StatusChanged;
     public event Action<double>? ProgressChanged;
@@ -107,6 +111,24 @@ public class ModelDownloadService : IDisposable
             if (File.Exists(tempZip))
                 File.Delete(tempZip);
         }
+    }
+
+    /// <summary>
+    /// Downloads SLANet-plus table model to modelsRoot/table/slanet-plus.onnx.
+    /// </summary>
+    public async Task DownloadTableModelAsync(string modelsRoot, CancellationToken cancellationToken = default)
+    {
+        var localPath = Path.Combine(modelsRoot, "table", TableModelFileName);
+        if (File.Exists(localPath))
+        {
+            StatusChanged?.Invoke($"  已存在，跳过: {TableModelFileName}");
+            return;
+        }
+
+        StatusChanged?.Invoke($"下载: table/{TableModelFileName}");
+        Directory.CreateDirectory(Path.GetDirectoryName(localPath)!);
+        await DownloadDirectUrlAsync(TableModelUrl, localPath, cancellationToken);
+        StatusChanged?.Invoke($"  完成: {TableModelFileName}");
     }
 
     private async Task DownloadDirectUrlAsync(string url, string localPath, CancellationToken cancellationToken)

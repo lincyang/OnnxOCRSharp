@@ -194,10 +194,20 @@ public sealed class OcrLineItem
 
 ## 依赖项
 
-- [Microsoft.ML.OnnxRuntime](https://www.nuget.org/packages/Microsoft.ML.OnnxRuntime) 1.26.0
+- [Microsoft.ML.OnnxRuntime](https://www.nuget.org/packages/Microsoft.ML.OnnxRuntime) 1.26.0（**默认 CPU**）
 - [OpenCvSharp4](https://www.nuget.org/packages/OpenCvSharp4) 4.13.0
 - [OpenCvSharp4.runtime.win](https://www.nuget.org/packages/OpenCvSharp4.runtime.win) 4.13.0
 - [Clipper2](https://www.nuget.org/packages/Clipper2) 2.0.0
+
+### GPU（可选）
+
+NuGet 包默认不包含 CUDA 原生库。源码构建若需 GPU：
+
+```bash
+dotnet build -p:UseOnnxGpu=true
+```
+
+或在消费项目中改用 [`Microsoft.ML.OnnxRuntime.Gpu`](https://www.nuget.org/packages/Microsoft.ML.OnnxRuntime.Gpu)，**不要**与 CPU 包同时引用。库内已保留 `AppendExecutionProvider_CUDA` 逻辑，无 CUDA 时会回退 CPU。
 
 ## 环境要求
 

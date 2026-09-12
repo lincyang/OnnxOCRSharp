@@ -160,7 +160,6 @@ static bool TryParsePreset(string value, out OcrModelPreset preset)
 {
     preset = value.Trim().ToLowerInvariant() switch
     {
-        "v5" or "ppocrv5" => OcrModelPreset.PpOcrV5,
         "v6" or "v6-tiny" or "ppocrv6-tiny" or "ppocrv6tiny" => OcrModelPreset.PpOcrV6Tiny,
         "v6-small" or "ppocrv6-small" or "ppocrv6small" => OcrModelPreset.PpOcrV6Small,
         "v6-medium" or "ppocrv6-medium" or "ppocrv6medium" => OcrModelPreset.PpOcrV6Medium,
@@ -168,7 +167,6 @@ static bool TryParsePreset(string value, out OcrModelPreset preset)
     };
 
     return value.Trim().ToLowerInvariant() is
-        "v5" or "ppocrv5" or
         "v6" or "v6-tiny" or "ppocrv6-tiny" or "ppocrv6tiny" or
         "v6-small" or "ppocrv6-small" or "ppocrv6small" or
         "v6-medium" or "ppocrv6-medium" or "ppocrv6medium";
@@ -179,8 +177,8 @@ static void PrintUsage()
     Console.WriteLine("Usage: OnnxOcr.Console [options] <image-path>");
     Console.WriteLine();
     Console.WriteLine("Options:");
-    Console.WriteLine("  --preset, -p <name>   v5 | v6 | v6-tiny | v6-small | v6-medium");
-    Console.WriteLine("  --models, -m <dir>    models root directory (contains ppocrv5/ or ppocrv6/)");
+    Console.WriteLine("  --preset, -p <name>   v6 | v6-tiny | v6-small | v6-medium");
+    Console.WriteLine("  --models, -m <dir>    models root directory (contains ppocrv6/)");
     Console.WriteLine("  --gpu, -g             use GPU for inference (auto-select device)");
     Console.WriteLine("  --gpu-id <id>         use specific GPU device ID");
     Console.WriteLine();

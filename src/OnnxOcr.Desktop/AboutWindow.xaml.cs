@@ -31,12 +31,12 @@ public partial class AboutWindow : Window
         AppVersion = ResolveVersion();
         VersionLabel = $"版本 {AppVersion}";
         IntroText =
-            "OnnxOCRSharp 是基于 ONNX Runtime + OpenCvSharp 的纯 .NET 离线 OCR 方案，" +
-            "支持 PP-OCRv6 系列模型、CPU/GPU 推理、竖排文字校正，以及多文件批量识别。" +
-            "本程序为官方桌面示例，欢迎关注公众号获取更新与用法。";
+            "LincOCR 社区桌面版，引擎基于 OnnxOCRSharp（ONNX Runtime + OpenCvSharp）。" +
+            "支持 PP-OCRv6 文字识别、表格结构识别与单张导出 Excel，以及 CPU/GPU 推理。" +
+            "欢迎关注公众号获取更新与用法。";
         MiniProgramIntro =
-            "需要还原表格结构、导出 Excel？推荐微信小程序「程序员Linc表格识别」：" +
-            "拍照/选图即可识表，也支持纯文字识别与一键复制。";
+            "LincOCR 已支持单张表格识别并导出 Excel。" +
+            "也可使用微信小程序「程序员Linc表格识别」随时拍照识表、纯文字识别与一键复制。";
 
         DataContext = this;
         InitializeComponent();

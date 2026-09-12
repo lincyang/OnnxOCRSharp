@@ -30,6 +30,8 @@ public partial class QueueItemViewModel : ObservableObject
 
     public ObservableCollection<OcrLineViewModel> Lines { get; } = new();
 
+    public TableRunResult? TableResult { get; private set; }
+
     [ObservableProperty]
     private QueueItemStatus _status = QueueItemStatus.Pending;
 
@@ -60,6 +62,7 @@ public partial class QueueItemViewModel : ObservableObject
 
     public void MarkSucceeded(OcrRunResult result)
     {
+        TableResult = null;
         Lines.Clear();
         foreach (var line in result.Lines)
             Lines.Add(OcrLineViewModel.From(line));
@@ -71,8 +74,25 @@ public partial class QueueItemViewModel : ObservableObject
         ErrorMessage = null;
     }
 
+    public void MarkSucceededTable(TableRunResult result)
+    {
+        TableResult = result;
+        Lines.Clear();
+        foreach (var line in result.OcrLines)
+            Lines.Add(OcrLineViewModel.From(line));
+
+        LineCount = Lines.Count;
+        ElapsedText = $"{result.TotalElapsed.TotalSeconds:F2}s";
+        Status = QueueItemStatus.Succeeded;
+        StatusText = result.CellTexts.Count > 0
+            ? $"表格 ({result.CellTexts.Count} 格)"
+            : LineCount > 0 ? $"完成 ({LineCount})" : "无表格";
+        ErrorMessage = null;
+    }
+
     public void MarkFailed(string message)
     {
+        TableResult = null;
         Lines.Clear();
         LineCount = 0;
         ElapsedText = "-";
@@ -85,6 +105,7 @@ public partial class QueueItemViewModel : ObservableObject
     {
         if (Status is QueueItemStatus.Succeeded or QueueItemStatus.Failed)
         {
+            TableResult = null;
             Status = QueueItemStatus.Pending;
             StatusText = "等待";
             ErrorMessage = null;

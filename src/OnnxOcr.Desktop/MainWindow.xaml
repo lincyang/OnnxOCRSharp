@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:controls="clr-namespace:OnnxOcr.Desktop.Controls"
         xmlns:vm="clr-namespace:OnnxOcr.Desktop.ViewModels"
-        Title="OnnxOCRSharp Desktop"
+        Title="LincOCR"
         Width="1280"
         Height="800"
         MinWidth="1040"
@@ -55,6 +55,18 @@
                               Height="28"
                               VerticalContentAlignment="Center"
                               Margin="0,0,10,0" />
+                    <TextBlock Text="模式:"
+                               VerticalAlignment="Center"
+                               Margin="0,0,6,0"
+                               Foreground="#333333" />
+                    <ComboBox ItemsSource="{Binding ModeOptions}"
+                              DisplayMemberPath="DisplayName"
+                              SelectedValuePath="Mode"
+                              SelectedValue="{Binding SelectedMode}"
+                              Width="100"
+                              Height="28"
+                              VerticalContentAlignment="Center"
+                              Margin="0,0,10,0" />
                     <TextBlock Text="设备:"
                                VerticalAlignment="Center"
                                Margin="0,0,6,0"
@@ -96,12 +108,24 @@
                             Height="32"
                             Margin="0,0,6,0"
                             Command="{Binding AddFilesCommand}"
-                            ToolTip="支持一次选择多张图片" />
+                            ToolTip="文字模式可多选；表格模式仅单张" />
                     <Button Content="添加文件夹"
                             Width="96"
                             Height="32"
                             Margin="0,0,6,0"
-                            Command="{Binding AddFolderCommand}" />
+                            Command="{Binding AddFolderCommand}"
+                            ToolTip="仅文字识别模式可用">
+                        <Button.Style>
+                            <Style TargetType="Button">
+                                <Setter Property="Visibility" Value="Visible" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsTextMode}" Value="False">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
                     <Button Content="开始识别"
                             Width="88"
                             Height="32"
@@ -112,22 +136,22 @@
                             Height="32"
                             Margin="0,0,6,0"
                             Command="{Binding CancelOperationCommand}" />
-                    <Button Content="复制当前"
-                            Width="88"
-                            Height="32"
-                            Margin="0,0,6,0"
-                            Command="{Binding CopyAllCommand}" />
-                    <Button Content="复制全部"
-                            Width="88"
-                            Height="32"
-                            Margin="0,0,6,0"
-                            Command="{Binding CopyBatchCommand}"
-                            ToolTip="按文件名分组复制全部识别结果" />
-                    <Button Content="导出"
+                    <Button Content="复制"
                             Width="64"
                             Height="32"
                             Margin="0,0,6,0"
+                            Command="{Binding CopyAllCommand}" />
+                    <Button Content="导出TXT"
+                            Width="80"
+                            Height="32"
+                            Margin="0,0,6,0"
                             Command="{Binding ExportResultsCommand}" />
+                    <Button Content="导出Excel"
+                            Width="88"
+                            Height="32"
+                            Margin="0,0,6,0"
+                            Command="{Binding ExportExcelCommand}"
+                            ToolTip="将表格识别结果导出为 .xlsx" />
                     <Button Content="移除"
                             Width="64"
                             Height="32"
@@ -164,7 +188,7 @@
                 <ColumnDefinition Width="2*" MinWidth="260" />
             </Grid.ColumnDefinitions>
 
-            <!-- File queue -->
+            <!-- Current file -->
             <Border Grid.Column="0"
                     Background="White"
                     BorderBrush="#DDDDDD"
@@ -178,10 +202,20 @@
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
                     <TextBlock Grid.Row="0"
-                               Text="文件队列"
                                FontSize="15"
                                FontWeight="SemiBold"
-                               Margin="0,0,0,4" />
+                               Margin="0,0,0,4">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Text" Value="文件队列" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsTableMode}" Value="True">
+                                        <Setter Property="Text" Value="当前文件" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
                     <TextBlock Grid.Row="1"
                                Text="{Binding QueueSummary}"
                                Foreground="#888888"
@@ -234,7 +268,7 @@
                         </ListBox.ItemTemplate>
                     </ListBox>
                     <TextBlock Grid.Row="2"
-                               Text="拖拽图片/文件夹到此处&#x0a;或点击「添加文件」"
+                               Text="拖拽图片到此处&#x0a;或点击「添加文件」"
                                HorizontalAlignment="Center"
                                VerticalAlignment="Center"
                                TextAlignment="Center"
@@ -366,6 +400,20 @@
             </DockPanel>
         </Border>
 
+        <!-- Recognition busy overlay (LincOCR spinner) -->
+        <controls:BusyOverlay Grid.Row="1" Grid.RowSpan="2">
+            <controls:BusyOverlay.Style>
+                <Style TargetType="controls:BusyOverlay">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsBatchRunning}" Value="True">
+                            <Setter Property="Visibility" Value="Visible" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </controls:BusyOverlay.Style>
+        </controls:BusyOverlay>
+
         <!-- Loading overlay -->
         <Border Grid.Row="1"
                 Grid.RowSpan="2"
@@ -378,7 +426,9 @@
                             <MultiDataTrigger.Conditions>
                                 <Condition Binding="{Binding IsBusy}" Value="True" />
                                 <Condition Binding="{Binding NeedsDownload}" Value="False" />
+                                <Condition Binding="{Binding ShowTableModelPrompt}" Value="False" />
                                 <Condition Binding="{Binding IsBatchRunning}" Value="False" />
+                                <Condition Binding="{Binding IsDownloading}" Value="False" />
                             </MultiDataTrigger.Conditions>
                             <Setter Property="Visibility" Value="Visible" />
                         </MultiDataTrigger>
@@ -496,6 +546,56 @@
                                 Height="32"
                                 IsCancel="True"
                                 Command="{Binding DismissDownloadPromptCommand}" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Border>
+
+        <!-- Table model prompt overlay -->
+        <Border Grid.Row="1"
+                Grid.RowSpan="2"
+                Background="#80000000">
+            <Border.Style>
+                <Style TargetType="Border">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding ShowTableModelPrompt}" Value="True">
+                            <Setter Property="Visibility" Value="Visible" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
+            <Border Background="White"
+                    CornerRadius="8"
+                    Padding="32,24"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    MinWidth="380">
+                <StackPanel>
+                    <TextBlock Text="表格模型未安装"
+                               FontSize="16"
+                               FontWeight="SemiBold"
+                               HorizontalAlignment="Center"
+                               Margin="0,0,0,8" />
+                    <TextBlock Text="表格识别需要 slanet-plus.onnx。文字识别仍可正常使用。"
+                               Foreground="#666666"
+                               FontSize="13"
+                               TextWrapping="Wrap"
+                               TextAlignment="Center"
+                               Margin="0,0,0,16"
+                               MaxWidth="340" />
+                    <StackPanel Orientation="Horizontal"
+                                HorizontalAlignment="Center">
+                        <Button Content="下载表格模型"
+                                Width="120"
+                                Height="32"
+                                Margin="0,0,12,0"
+                                Command="{Binding DownloadTableModelCommand}" />
+                        <Button Content="稍后"
+                                Width="80"
+                                Height="32"
+                                IsCancel="True"
+                                Command="{Binding DismissTableModelPromptCommand}" />
                     </StackPanel>
                 </StackPanel>
             </Border>

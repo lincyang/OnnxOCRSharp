@@ -1,0 +1,51 @@
+<UserControl x:Class="OnnxOcr.Desktop.Controls.BusyOverlay"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             IsHitTestVisible="True">
+    <UserControl.Resources>
+        <Storyboard x:Key="SpinStoryboard" RepeatBehavior="Forever">
+            <DoubleAnimation Storyboard.TargetName="SpinRing"
+                             Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)"
+                             From="0" To="360" Duration="0:0:1.4" />
+        </Storyboard>
+    </UserControl.Resources>
+
+    <Border Background="#990F172A">
+        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+            <Grid Width="120" Height="120" Margin="0,0,0,20">
+                <Ellipse Width="108" Height="108"
+                         Stroke="#33FFFFFF"
+                         StrokeThickness="3"
+                         HorizontalAlignment="Center"
+                         VerticalAlignment="Center" />
+                <Ellipse x:Name="SpinRing"
+                         Width="108" Height="108"
+                         Stroke="#5B8DEF"
+                         StrokeThickness="3"
+                         StrokeDashArray="2.2 8"
+                         StrokeStartLineCap="Round"
+                         StrokeEndLineCap="Round"
+                         HorizontalAlignment="Center"
+                         VerticalAlignment="Center"
+                         RenderTransformOrigin="0.5,0.5">
+                    <Ellipse.RenderTransform>
+                        <RotateTransform Angle="0" />
+                    </Ellipse.RenderTransform>
+                </Ellipse>
+                <TextBlock Text="LincOCR"
+                           FontSize="18"
+                           FontWeight="SemiBold"
+                           Foreground="White"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center" />
+            </Grid>
+            <TextBlock Text="{Binding StatusMessage}"
+                       Foreground="#E5E7EB"
+                       FontSize="14"
+                       HorizontalAlignment="Center"
+                       TextAlignment="Center"
+                       MaxWidth="360"
+                       TextWrapping="Wrap" />
+        </StackPanel>
+    </Border>
+</UserControl>

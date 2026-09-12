@@ -1,6 +1,6 @@
 # OnnxOCRSharp
 
-OnnxOCR 的 C# 移植版——使用 ONNX Runtime + OpenCvSharp 实现的纯 .NET OCR 方案，支持 PP-OCRv6 系列模型，内含 WPF 示例程序。
+OnnxOCR 的 C# 移植版——使用 ONNX Runtime + OpenCvSharp 实现的纯 .NET OCR 方案，支持 PP-OCRv6 系列模型。官方桌面客户端为 **LincOCR**（社区版：单张文字/表格识别，表格可导出 Excel）。
 
 ## 项目来源
 
@@ -12,15 +12,17 @@ OnnxOCR 的 C# 移植版——使用 ONNX Runtime + OpenCvSharp 实现的纯 .NE
 OnnxOCRSharp/
 ├── OnnxOcr.sln
 ├── models/                   # 模型文件目录，下载后目录结构如下
-│   └── ppocrv6/
-│       ├── PP-OCRv6_tiny_det_onnx/inference.onnx
-│       └── PP-OCRv6_tiny_rec_onnx/
-│           ├── inference.onnx
-│           └── inference.yml
+│   ├── ppocrv6/
+│   │   ├── PP-OCRv6_tiny_det_onnx/inference.onnx
+│   │   └── PP-OCRv6_tiny_rec_onnx/
+│   │       ├── inference.onnx
+│   │       └── inference.yml
+│   └── table/
+│       └── slanet-plus.onnx  # 表格结构模型（可选）
 ├── src/
-│   ├── OnnxOcr.Core/          # OCR 引擎（检测 + 识别）
+│   ├── OnnxOcr.Core/          # OCR 引擎（检测 + 识别 + 表格结构）
 │   ├── OnnxOcr.App/            # 应用服务层
-│   ├── OnnxOcr.Desktop/        # WPF 桌面程序
+│   ├── OnnxOcr.Desktop/        # LincOCR 桌面程序（WPF）
 │   └── OnnxOcr.Console/        # 命令行验证工具
 └── test_assets/               # 测试图片
 ```
@@ -35,11 +37,17 @@ OnnxOCRSharp/
 ### Visual Studio 2022
 
 1. 打开 `OnnxOcr.sln`
-2. 右键 **`OnnxOcr.Desktop`** → **设为启动项目**（WPF 图形界面）
+2. 右键 **`OnnxOcr.Desktop`** → **设为启动项目**（LincOCR 图形界面）
    - 命令行测试仍可用 **`OnnxOcr.Console`**
 3. 按 **F5** 运行
 
-界面功能：添加文件/文件夹（支持多选与拖拽）→ 开始批量识别 → 左队列 / 中预览与检测框 / 右结果 → 复制当前/全部 → 导出。
+界面功能：文字模式支持多文件/文件夹批量识别；表格模式仅单张并导出 Excel。识别中显示 LincOCR 品牌转圈。
+
+默认发布为 **CPU** 版。若本机有 CUDA 且需要 GPU 构建：
+
+```bash
+dotnet build -p:UseOnnxGpu=true
+```
 
 ### Visual Studio 2022（Console）
 

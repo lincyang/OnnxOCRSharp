@@ -33,6 +33,12 @@ public enum InferenceDevice
     Gpu,
 }
 
+public enum RecognizeMode
+{
+    Text,
+    Table,
+}
+
 public partial class MainViewModel : ObservableObject, IAsyncDisposable
 {
     private static readonly HashSet<string> SupportedExtensions = new(StringComparer.OrdinalIgnoreCase)
@@ -44,10 +50,12 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
 
     private readonly OcrService? _ownedOcrService;
     private OcrService? _ocrService;
+    private TableOcrService? _tableService;
     private CancellationTokenSource? _recognizeCts;
     private CancellationTokenSource? _loadModelCts;
     private bool _suppressModelReload;
     private bool _suppressSelectionSync;
+    private bool _tablePromptDismissed;
 
     public MainViewModel()
         : this(null)
@@ -60,10 +68,15 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
         _ocrService = ocrService;
         PresetOptions = new List<PresetOption>
         {
-            new(OcrModelPreset.PpOcrV5, "PP-OCRv5"),
             new(OcrModelPreset.PpOcrV6Tiny, "PP-OCRv6 Tiny"),
             new(OcrModelPreset.PpOcrV6Small, "PP-OCRv6 Small"),
             new(OcrModelPreset.PpOcrV6Medium, "PP-OCRv6 Medium"),
+        };
+
+        ModeOptions = new List<ModeOption>
+        {
+            new(RecognizeMode.Text, "文字识别"),
+            new(RecognizeMode.Table, "表格识别"),
         };
 
         GpuDevices = DetectGpuDevices();
@@ -89,6 +102,7 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
 
     public List<PresetOption> PresetOptions { get; }
     public List<DeviceOption> DeviceOptions { get; }
+    public List<ModeOption> ModeOptions { get; }
     public IReadOnlyList<GpuDeviceInfo> GpuDevices { get; }
 
     public ObservableCollection<QueueItemViewModel> QueueItems { get; } = new();
@@ -102,6 +116,9 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
 
     [ObservableProperty]
     private OcrModelPreset _selectedPreset = OcrModelPreset.PpOcrV6Tiny;
+
+    [ObservableProperty]
+    private RecognizeMode _selectedMode = RecognizeMode.Text;
 
     [ObservableProperty]
     private BitmapSource? _previewImage;
@@ -125,7 +142,7 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
     private string _elapsedText = "耗时: -";
 
     [ObservableProperty]
-    private string _queueSummary = "队列: 0";
+    private string _queueSummary = "文件: 0";
 
     [ObservableProperty]
     private bool _hasQueueItems;
@@ -151,10 +168,20 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
     [ObservableProperty]
     private bool _isDownloadSupported;
 
+    [ObservableProperty]
+    private bool _needsTableModel;
+
+    [ObservableProperty]
+    private bool _canExportExcel;
+
+    public bool ShowTableModelPrompt =>
+        NeedsTableModel && SelectedMode == RecognizeMode.Table && !NeedsDownload && !_tablePromptDismissed;
+
     public async Task InitializeAsync()
     {
         if (_ocrService != null)
         {
+            TryCreateTableService(SelectedPreset);
             IsReady = true;
             StatusMessage = "就绪";
             return;
@@ -195,10 +222,13 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
                 _ocrService?.Dispose();
 
             _ocrService = service;
+            TryCreateTableService(preset);
             IsReady = true;
             StatusMessage = SelectedDevice == InferenceDevice.Gpu
                 ? $"就绪 (GPU: {SelectedGpuDevice?.Name ?? "auto"})"
                 : "就绪 (CPU)";
+            if (NeedsTableModel && SelectedMode == RecognizeMode.Table)
+                StatusMessage += " · 表格模型未安装";
         }
         catch (OperationCanceledException)
         {
@@ -220,6 +250,23 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
         {
             IsBusy = false;
             RefreshCommands();
+            NotifyTablePrompt();
+        }
+    }
+
+    private void TryCreateTableService(OcrModelPreset preset)
+    {
+        _tableService?.Dispose();
+        _tableService = null;
+        NeedsTableModel = false;
+
+        try
+        {
+            _tableService = new TableOcrService(CreateOcrOptions(preset));
+        }
+        catch (Exception ex) when (IsModelNotFoundException(ex))
+        {
+            NeedsTableModel = true;
         }
     }
 
@@ -229,6 +276,8 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
         IsDownloadSupported = IsV6Preset(preset);
         StatusMessage = "模型文件未找到";
         IsReady = false;
+        _tableService?.Dispose();
+        _tableService = null;
     }
 
     private static bool IsModelNotFoundException(Exception ex)
@@ -298,6 +347,68 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
 
     private bool CanDownload() => IsDownloadSupported && !IsBusy && !IsDownloading;
 
+    [RelayCommand(CanExecute = nameof(CanDownloadTable))]
+    private async Task DownloadTableModelAsync()
+    {
+        _loadModelCts?.Cancel();
+        _loadModelCts = new CancellationTokenSource();
+        var token = _loadModelCts.Token;
+
+        try
+        {
+            IsDownloading = true;
+            IsBusy = true;
+            NeedsTableModel = false;
+            DownloadProgress = 0;
+            DownloadStatus = "准备下载表格模型...";
+            RefreshCommands();
+            NotifyTablePrompt();
+
+            using var downloader = new ModelDownloadService();
+            downloader.StatusChanged += status => DownloadStatus = status;
+            downloader.ProgressChanged += progress => DownloadProgress = progress * 100;
+
+            await downloader.DownloadTableModelAsync(FindModelsRoot(), token);
+
+            DownloadStatus = "下载完成，正在加载表格模型...";
+            TryCreateTableService(SelectedPreset);
+            if (NeedsTableModel)
+            {
+                StatusMessage = "表格模型仍不可用";
+                MessageBox.Show(
+                    "表格模型下载后仍无法加载，请检查 models/table/slanet-plus.onnx。",
+                    "表格模型",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            }
+            else
+            {
+                StatusMessage = "表格模型已就绪";
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            StatusMessage = "已取消";
+            NeedsTableModel = true;
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"表格模型下载失败: {ex.Message}";
+            DownloadStatus = "";
+            NeedsTableModel = true;
+            MessageBox.Show(ex.Message, "下载失败", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally
+        {
+            IsDownloading = false;
+            IsBusy = false;
+            RefreshCommands();
+            NotifyTablePrompt();
+        }
+    }
+
+    private bool CanDownloadTable() => NeedsTableModel && !IsBusy && !IsDownloading;
+
     private string FindModelsRoot()
     {
         var searchRoot = AppContext.BaseDirectory;
@@ -345,19 +456,62 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
             _ = LoadModelAsync(SelectedPreset);
     }
 
+    partial void OnSelectedModeChanged(RecognizeMode value)
+    {
+        _tablePromptDismissed = false;
+        OnPropertyChanged(nameof(IsTextMode));
+        OnPropertyChanged(nameof(IsTableMode));
+        NotifyTablePrompt();
+
+        ClearWorkspace(value == RecognizeMode.Table
+            ? "已切换到表格识别，请重新添加图片"
+            : "已切换到文字识别，请重新添加图片");
+
+        RefreshCommands();
+    }
+
+    public bool IsTextMode => SelectedMode == RecognizeMode.Text;
+    public bool IsTableMode => SelectedMode == RecognizeMode.Table;
+
+    private void ClearWorkspace(string statusMessage)
+    {
+        QueueItems.Clear();
+        PreviewImage = null;
+        Lines.Clear();
+        SelectedLine = null;
+        SelectedQueueItem = null;
+        CanExportExcel = false;
+        ElapsedText = "耗时: -";
+        BatchProgress = 0;
+        UpdateQueueSummary();
+        StatusMessage = statusMessage;
+    }
+
+    partial void OnNeedsTableModelChanged(bool value)
+    {
+        if (value)
+            _tablePromptDismissed = false;
+        NotifyTablePrompt();
+    }
+
+    private void NotifyTablePrompt() => OnPropertyChanged(nameof(ShowTableModelPrompt));
+
     public bool IsGpuSelected => SelectedDevice == InferenceDevice.Gpu;
 
-    private OcrService CreateOcrService(OcrModelPreset preset)
+    private OcrOptions CreateOcrOptions(OcrModelPreset preset)
     {
         if (SelectedDevice == InferenceDevice.Gpu)
         {
             if (SelectedGpuDevice != null)
-                return OcrService.CreateWithGpu(preset, SelectedGpuDevice.DeviceId);
-            return OcrService.CreateWithAutoDevice(preset);
+                return OcrOptions.ForPresetWithGpu(preset, SelectedGpuDevice.DeviceId);
+            return OcrOptions.ForPresetWithAutoDevice(preset);
         }
 
-        return new OcrService(preset);
+        return OcrOptions.ForPreset(preset);
     }
+
+    private OcrService CreateOcrService(OcrModelPreset preset)
+        => new OcrService(CreateOcrOptions(preset));
 
     private static IReadOnlyList<GpuDeviceInfo> DetectGpuDevices()
     {
@@ -379,9 +533,9 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
     {
         var dialog = new OpenFileDialog
         {
-            Title = "选择图片（可多选）",
+            Title = IsTableMode ? "选择表格图片" : "选择图片（可多选）",
             Filter = "图片文件|*.jpg;*.jpeg;*.png;*.bmp;*.webp|所有文件|*.*",
-            Multiselect = true,
+            Multiselect = IsTextMode,
         };
 
         if (dialog.ShowDialog() != true)
@@ -390,7 +544,7 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
         AddPaths(dialog.FileNames);
     }
 
-    [RelayCommand(CanExecute = nameof(CanModifyQueue))]
+    [RelayCommand(CanExecute = nameof(CanAddFolder))]
     private void AddFolder()
     {
         var dialog = new OpenFolderDialog
@@ -425,6 +579,17 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
         {
             if (Directory.Exists(path))
             {
+                if (IsTableMode)
+                {
+                    var firstInFolder = Directory.EnumerateFiles(path, "*.*", SearchOption.TopDirectoryOnly)
+                        .Where(IsSupportedImage)
+                        .OrderBy(f => f, StringComparer.OrdinalIgnoreCase)
+                        .FirstOrDefault();
+                    if (firstInFolder != null)
+                        expanded.Add(firstInFolder);
+                    break;
+                }
+
                 expanded.AddRange(
                     Directory.EnumerateFiles(path, "*.*", SearchOption.TopDirectoryOnly)
                         .Where(IsSupportedImage));
@@ -432,6 +597,8 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
             else if (File.Exists(path) && IsSupportedImage(path))
             {
                 expanded.Add(path);
+                if (IsTableMode)
+                    break;
             }
         }
 
@@ -440,6 +607,39 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
 
     private void AddPaths(IEnumerable<string> paths)
     {
+        var candidates = paths
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Where(p => IsSupportedImage(p) && File.Exists(p))
+            .ToList();
+
+        if (candidates.Count == 0)
+        {
+            StatusMessage = "没有可用的图片";
+            return;
+        }
+
+        if (IsTableMode)
+        {
+            QueueItems.Clear();
+            PreviewImage = null;
+            Lines.Clear();
+            SelectedLine = null;
+            SelectedQueueItem = null;
+            CanExportExcel = false;
+            ElapsedText = "耗时: -";
+            BatchProgress = 0;
+
+            var item = new QueueItemViewModel(candidates[0]);
+            QueueItems.Add(item);
+            SelectedQueueItem = item;
+            UpdateQueueSummary();
+            RefreshCommands();
+            StatusMessage = candidates.Count > 1
+                ? $"表格模式仅支持单张，已选择: {item.FileName}"
+                : $"已选择: {item.FileName}";
+            return;
+        }
+
         var existing = new HashSet<string>(
             QueueItems.Select(i => i.FilePath),
             StringComparer.OrdinalIgnoreCase);
@@ -447,10 +647,8 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
         var added = 0;
         QueueItemViewModel? firstAdded = null;
 
-        foreach (var path in paths.Distinct(StringComparer.OrdinalIgnoreCase))
+        foreach (var path in candidates)
         {
-            if (!IsSupportedImage(path) || !File.Exists(path))
-                continue;
             if (!existing.Add(path))
                 continue;
 
@@ -479,11 +677,27 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
         return SupportedExtensions.Contains(Path.GetExtension(path));
     }
 
+    private bool CanAddFolder() => IsTextMode && CanModifyQueue();
+
     [RelayCommand(CanExecute = nameof(CanRecognize))]
     private async Task RecognizeAsync()
     {
         if (_ocrService == null || QueueItems.Count == 0)
             return;
+
+        if (SelectedMode == RecognizeMode.Table && _tableService == null)
+        {
+            NeedsTableModel = true;
+            NotifyTablePrompt();
+            StatusMessage = "请先下载表格模型";
+            MessageBox.Show(
+                "表格模型未安装。请下载 models/table/slanet-plus.onnx 后再试。",
+                "表格识别",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            RefreshCommands();
+            return;
+        }
 
         var targets = QueueItems
             .Where(i => i.Status is QueueItemStatus.Pending or QueueItemStatus.Failed)
@@ -496,6 +710,23 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
             targets = QueueItems.ToList();
         }
 
+        // 表格模式强制只处理一张（当前选中或队列首项）
+        if (SelectedMode == RecognizeMode.Table)
+        {
+            var keep = SelectedQueueItem ?? QueueItems[0];
+            if (QueueItems.Count > 1)
+            {
+                var toRemove = QueueItems.Where(i => !ReferenceEquals(i, keep)).ToList();
+                foreach (var item in toRemove)
+                    QueueItems.Remove(item);
+                SelectedQueueItem = keep;
+                UpdateQueueSummary();
+            }
+
+            keep.ResetForRerun();
+            targets = new List<QueueItemViewModel> { keep };
+        }
+
         _recognizeCts?.Cancel();
         _recognizeCts = new CancellationTokenSource();
         var token = _recognizeCts.Token;
@@ -506,11 +737,13 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
             IsBatchRunning = true;
             BatchProgress = 0;
             SelectedLine = null;
+            CanExportExcel = false;
             RefreshCommands();
 
             var deviceTag = SelectedDevice == InferenceDevice.Gpu
                 ? $"[GPU:{SelectedGpuDevice?.Name ?? "auto"}]"
                 : "[CPU]";
+            var modeTag = SelectedMode == RecognizeMode.Table ? "[表格]" : "[文字]";
 
             var sw = Stopwatch.StartNew();
             var succeeded = 0;
@@ -535,8 +768,17 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
 
                 try
                 {
-                    var result = await _ocrService.RecognizeAsync(item.FilePath, token);
-                    item.MarkSucceeded(result);
+                    if (SelectedMode == RecognizeMode.Table)
+                    {
+                        var tableResult = await _tableService!.RecognizeAsync(item.FilePath, token);
+                        item.MarkSucceededTable(tableResult);
+                    }
+                    else
+                    {
+                        var result = await _ocrService.RecognizeAsync(item.FilePath, token);
+                        item.MarkSucceeded(result);
+                    }
+
                     succeeded++;
 
                     if (ReferenceEquals(SelectedQueueItem, item))
@@ -561,10 +803,10 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
             }
 
             sw.Stop();
-            ElapsedText = $"{deviceTag} 批量耗时: {sw.Elapsed.TotalSeconds:F2}s，成功 {succeeded}，失败 {failed}";
+            ElapsedText = $"{deviceTag}{modeTag} 耗时: {sw.Elapsed.TotalSeconds:F2}s，成功 {succeeded}，失败 {failed}";
             StatusMessage = failed == 0
-                ? $"批量识别完成 {deviceTag}"
-                : $"批量完成（含失败）{deviceTag}";
+                ? $"识别完成 {deviceTag}{modeTag}"
+                : $"完成（含失败）{deviceTag}{modeTag}";
         }
         catch (OperationCanceledException)
         {
@@ -580,6 +822,7 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
             IsBusy = false;
             IsBatchRunning = false;
             UpdateQueueSummary();
+            CanExportExcel = SelectedQueueItem?.TableResult != null;
             RefreshCommands();
         }
     }
@@ -587,15 +830,7 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
     [RelayCommand(CanExecute = nameof(CanClear))]
     private void Clear()
     {
-        QueueItems.Clear();
-        PreviewImage = null;
-        Lines.Clear();
-        SelectedLine = null;
-        SelectedQueueItem = null;
-        ElapsedText = "耗时: -";
-        BatchProgress = 0;
-        UpdateQueueSummary();
-        StatusMessage = "就绪";
+        ClearWorkspace("就绪");
         RefreshCommands();
     }
 
@@ -618,6 +853,7 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
             Lines.Clear();
             SelectedLine = null;
             ElapsedText = "耗时: -";
+            CanExportExcel = false;
         }
 
         UpdateQueueSummary();
@@ -659,7 +895,7 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
             return;
 
         Clipboard.SetText(sb.ToString().TrimEnd());
-        StatusMessage = "已复制全部文件结果";
+        StatusMessage = "已复制识别结果";
     }
 
     [RelayCommand(CanExecute = nameof(CanExport))]
@@ -676,7 +912,7 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
             return;
 
         var sb = new StringBuilder();
-        sb.AppendLine($"OnnxOCRSharp 批量识别结果");
+        sb.AppendLine("LincOCR 识别结果");
         sb.AppendLine($"公众号：{WeChatOfficialAccount}");
         sb.AppendLine($"导出时间：{DateTime.Now:yyyy-MM-dd HH:mm:ss}");
         sb.AppendLine();
@@ -704,6 +940,46 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
         File.WriteAllText(dialog.FileName, sb.ToString(), Encoding.UTF8);
         StatusMessage = $"已导出: {Path.GetFileName(dialog.FileName)}";
     }
+
+    [RelayCommand(CanExecute = nameof(CanExportExcelNow))]
+    private void ExportExcel()
+    {
+        var item = SelectedQueueItem;
+        if (item?.TableResult == null)
+            return;
+
+        var dialog = new SaveFileDialog
+        {
+            Title = "导出表格 Excel",
+            Filter = "Excel 工作簿|*.xlsx|所有文件|*.*",
+            FileName = $"{Path.GetFileNameWithoutExtension(item.FileName)}_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx",
+        };
+
+        if (dialog.ShowDialog() != true)
+            return;
+
+        try
+        {
+            TableExcelExporter.Export(
+                dialog.FileName,
+                item.TableResult.LogicPoints,
+                item.TableResult.CellTexts);
+            StatusMessage = $"已导出 Excel: {Path.GetFileName(dialog.FileName)}";
+
+            var owner = Application.Current?.MainWindow;
+            var resultDialog = new ExportResultWindow(dialog.FileName);
+            if (owner != null && owner.IsLoaded)
+                resultDialog.Owner = owner;
+            resultDialog.ShowDialog();
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"导出 Excel 失败: {ex.Message}";
+            MessageBox.Show(ex.Message, "导出失败", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private bool CanExportExcelNow() => !IsBusy && SelectedQueueItem?.TableResult != null;
 
     [RelayCommand]
     private void CopyWeChatAccount()
@@ -752,6 +1028,7 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
         }
 
         RefreshCommands();
+        NotifyTablePrompt();
     }
 
     [RelayCommand]
@@ -760,6 +1037,14 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
         NeedsDownload = false;
         IsDownloadSupported = false;
         StatusMessage = "模型未就绪";
+    }
+
+    [RelayCommand]
+    private void DismissTableModelPrompt()
+    {
+        _tablePromptDismissed = true;
+        StatusMessage = "表格模型未安装（可稍后下载）";
+        NotifyTablePrompt();
     }
 
     partial void OnSelectedQueueItemChanged(QueueItemViewModel? value)
@@ -795,11 +1080,13 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
     {
         Lines.Clear();
         SelectedLine = null;
+        CanExportExcel = item?.TableResult != null;
 
         if (item == null)
         {
             PreviewImage = null;
             ElapsedText = "耗时: -";
+            RefreshCommands();
             return;
         }
 
@@ -824,23 +1111,38 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
 
         ElapsedText = item.Status switch
         {
+            QueueItemStatus.Succeeded when item.TableResult != null
+                => $"当前: {item.FileName} | {item.ElapsedText} | {item.TableResult.CellTexts.Count} 格",
             QueueItemStatus.Succeeded => $"当前: {item.FileName} | {item.ElapsedText} | {item.LineCount} 行",
             QueueItemStatus.Failed => $"当前: {item.FileName} | 失败: {item.ErrorMessage}",
             QueueItemStatus.Running => $"当前: {item.FileName} | 识别中...",
             _ => $"当前: {item.FileName} | 等待识别",
         };
+
+        RefreshCommands();
     }
 
     private void UpdateQueueSummary()
     {
         var total = QueueItems.Count;
         HasQueueItems = total > 0;
+        if (total == 0)
+        {
+            QueueSummary = IsTableMode ? "文件: 0" : "队列: 0";
+            return;
+        }
+
+        if (IsTableMode || total == 1)
+        {
+            var item = SelectedQueueItem ?? QueueItems[0];
+            QueueSummary = $"文件: {item.FileName}（{item.StatusText}）";
+            return;
+        }
+
         var done = QueueItems.Count(i => i.Status is QueueItemStatus.Succeeded or QueueItemStatus.Failed);
         var ok = QueueItems.Count(i => i.Status == QueueItemStatus.Succeeded);
         var fail = QueueItems.Count(i => i.Status == QueueItemStatus.Failed);
-        QueueSummary = total == 0
-            ? "队列: 0"
-            : $"队列: {done}/{total}（成功 {ok} / 失败 {fail}）";
+        QueueSummary = $"队列: {done}/{total}（成功 {ok} / 失败 {fail}）";
     }
 
     private void RefreshCommands()
@@ -851,10 +1153,12 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
         CopyAllCommand.NotifyCanExecuteChanged();
         CopyBatchCommand.NotifyCanExecuteChanged();
         ExportResultsCommand.NotifyCanExecuteChanged();
+        ExportExcelCommand.NotifyCanExecuteChanged();
         CancelOperationCommand.NotifyCanExecuteChanged();
         ClearCommand.NotifyCanExecuteChanged();
         RemoveSelectedCommand.NotifyCanExecuteChanged();
         DownloadModelCommand.NotifyCanExecuteChanged();
+        DownloadTableModelCommand.NotifyCanExecuteChanged();
     }
 
     public async ValueTask DisposeAsync()
@@ -863,6 +1167,9 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
         _loadModelCts?.Dispose();
         _recognizeCts?.Cancel();
         _recognizeCts?.Dispose();
+
+        _tableService?.Dispose();
+        _tableService = null;
 
         if (_ownedOcrService != null)
             _ownedOcrService.Dispose();
@@ -893,6 +1200,18 @@ public class DeviceOption
     public DeviceOption(InferenceDevice device, string displayName)
     {
         Device = device;
+        DisplayName = displayName;
+    }
+}
+
+public class ModeOption
+{
+    public RecognizeMode Mode { get; }
+    public string DisplayName { get; }
+
+    public ModeOption(RecognizeMode mode, string displayName)
+    {
+        Mode = mode;
         DisplayName = displayName;
     }
 }

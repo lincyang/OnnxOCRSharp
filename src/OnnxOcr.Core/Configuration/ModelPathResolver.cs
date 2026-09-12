@@ -10,28 +10,8 @@
 //-----------------------------------------------------------------------
 namespace OnnxOcr.Core.Configuration;
 
-internal static class ModelPathResolver
+public static class ModelPathResolver
 {
-    public static string FindPpOcrV5ModelsRoot(string? modelsRoot = null)
-    {
-        foreach (var root in GetSearchRoots(modelsRoot))
-        {
-            var candidateInProject = Path.Combine(root, "models", "ppocrv5");
-            if (Directory.Exists(candidateInProject))
-                return candidateInProject;
-
-            var candidateDirect = Path.Combine(root, "ppocrv5");
-            if (Directory.Exists(candidateDirect))
-                return candidateDirect;
-
-            var candidateInSibling = Path.Combine(root, "OnnxOCR", "onnxocr", "models", "ppocrv5");
-            if (Directory.Exists(candidateInSibling))
-                return candidateInSibling;
-        }
-
-        throw new DirectoryNotFoundException("PP-OCRv5 models not found.");
-    }
-
     public static string FindPpOcrV6ModelsRoot(string? modelsRoot = null)
     {
         foreach (var root in GetSearchRoots(modelsRoot))
@@ -52,8 +32,6 @@ internal static class ModelPathResolver
     {
         return preset switch
         {
-            OcrModelPreset.PpOcrV5 => ResolveFirstExisting(
-                Path.Combine(FindPpOcrV5ModelsRoot(modelsRoot), "det", "det.onnx")),
             OcrModelPreset.PpOcrV6Tiny => ResolveV6DetModel("tiny", modelsRoot),
             OcrModelPreset.PpOcrV6Small => ResolveV6DetModel("small", modelsRoot),
             OcrModelPreset.PpOcrV6Medium => ResolveV6DetModel("medium", modelsRoot),
@@ -65,8 +43,6 @@ internal static class ModelPathResolver
     {
         return preset switch
         {
-            OcrModelPreset.PpOcrV5 => ResolveFirstExisting(
-                Path.Combine(FindPpOcrV5ModelsRoot(modelsRoot), "rec", "rec.onnx")),
             OcrModelPreset.PpOcrV6Tiny => ResolveV6RecModel("tiny", modelsRoot),
             OcrModelPreset.PpOcrV6Small => ResolveV6RecModel("small", modelsRoot),
             OcrModelPreset.PpOcrV6Medium => ResolveV6RecModel("medium", modelsRoot),
@@ -78,8 +54,6 @@ internal static class ModelPathResolver
     {
         return preset switch
         {
-            OcrModelPreset.PpOcrV5 => ResolveFirstExisting(
-                Path.Combine(FindPpOcrV5ModelsRoot(modelsRoot), "ppocrv5_dict.txt")),
             OcrModelPreset.PpOcrV6Tiny => ResolveRecDictionaryPath(ResolveV6RecModel("tiny", modelsRoot)),
             OcrModelPreset.PpOcrV6Small => ResolveRecDictionaryPath(ResolveV6RecModel("small", modelsRoot)),
             OcrModelPreset.PpOcrV6Medium => ResolveRecDictionaryPath(ResolveV6RecModel("medium", modelsRoot)),
@@ -111,6 +85,35 @@ internal static class ModelPathResolver
             var candidateInSibling = Path.Combine(root, "OnnxOCR", "onnxocr", "models", "orientation", "rapid_orientation.onnx");
             if (File.Exists(candidateInSibling))
                 return candidateInSibling;
+        }
+
+        return "";
+    }
+
+    /// <summary>
+    /// Locates SLANet-plus table model at models/table/slanet-plus.onnx (or sibling OnnxOCR path).
+    /// Returns empty string when not found.
+    /// </summary>
+    public static string FindTableModelPath(string? modelsRoot = null)
+    {
+        const string fileName = "slanet-plus.onnx";
+        foreach (var root in GetSearchRoots(modelsRoot))
+        {
+            var candidateInProject = Path.Combine(root, "models", "table", fileName);
+            if (File.Exists(candidateInProject))
+                return candidateInProject;
+
+            var candidateDirect = Path.Combine(root, "table", fileName);
+            if (File.Exists(candidateDirect))
+                return candidateDirect;
+
+            var candidateInSibling = Path.Combine(root, "OnnxOCR", "onnxocr", "models", "table", fileName);
+            if (File.Exists(candidateInSibling))
+                return candidateInSibling;
+
+            var candidateRapidDoc = Path.Combine(root, "OnnxOCR", "onnxocr", "models", "rapid_doc", "table", fileName);
+            if (File.Exists(candidateRapidDoc))
+                return candidateRapidDoc;
         }
 
         return "";

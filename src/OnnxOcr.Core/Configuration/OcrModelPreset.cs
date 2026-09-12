@@ -12,7 +12,6 @@ namespace OnnxOcr.Core.Configuration;
 
 public enum OcrModelPreset
 {
-    PpOcrV5,
     PpOcrV6Tiny,
     PpOcrV6Small,
     PpOcrV6Medium,
