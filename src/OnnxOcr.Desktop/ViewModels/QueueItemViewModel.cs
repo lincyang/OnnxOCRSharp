@@ -84,8 +84,9 @@ public partial class QueueItemViewModel : ObservableObject
         LineCount = Lines.Count;
         ElapsedText = $"{result.TotalElapsed.TotalSeconds:F2}s";
         Status = QueueItemStatus.Succeeded;
+        var filled = result.CellTexts.Count(t => !string.IsNullOrWhiteSpace(t));
         StatusText = result.CellTexts.Count > 0
-            ? $"表格 ({result.CellTexts.Count} 格)"
+            ? $"表格 ({filled}/{result.CellTexts.Count} 非空)"
             : LineCount > 0 ? $"完成 ({LineCount})" : "无表格";
         ErrorMessage = null;
     }

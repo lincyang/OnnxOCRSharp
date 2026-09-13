@@ -53,6 +53,8 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
     private TableOcrService? _tableService;
     private CancellationTokenSource? _recognizeCts;
     private CancellationTokenSource? _loadModelCts;
+    private Task? _recognizeTask;
+    private int _recognizeGeneration;
     private bool _suppressModelReload;
     private bool _suppressSelectionSync;
     private bool _tablePromptDismissed;
@@ -699,6 +701,18 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
             return;
         }
 
+        // Wait for a previously cancelled run to fully release OCR engines
+        // (ONNX sessions are not safe for concurrent Run calls).
+        var previous = _recognizeTask;
+        _recognizeCts?.Cancel();
+        if (previous != null)
+        {
+            StatusMessage = "正在等待上次识别结束...";
+            try { await previous.ConfigureAwait(true); }
+            catch (OperationCanceledException) { /* expected */ }
+            catch { /* ignore faults from cancelled run */ }
+        }
+
         var targets = QueueItems
             .Where(i => i.Status is QueueItemStatus.Pending or QueueItemStatus.Failed)
             .ToList();
@@ -727,10 +741,21 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
             targets = new List<QueueItemViewModel> { keep };
         }
 
-        _recognizeCts?.Cancel();
+        _recognizeCts?.Dispose();
         _recognizeCts = new CancellationTokenSource();
         var token = _recognizeCts.Token;
+        var generation = ++_recognizeGeneration;
 
+        var run = RecognizeCoreAsync(targets, token, generation);
+        _recognizeTask = run;
+        await run.ConfigureAwait(true);
+    }
+
+    private async Task RecognizeCoreAsync(
+        List<QueueItemViewModel> targets,
+        CancellationToken token,
+        int generation)
+    {
         try
         {
             IsBusy = true;
@@ -770,12 +795,14 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
                 {
                     if (SelectedMode == RecognizeMode.Table)
                     {
-                        var tableResult = await _tableService!.RecognizeAsync(item.FilePath, token);
+                        var tableResult = await _tableService!.RecognizeAsync(item.FilePath, token)
+                            .ConfigureAwait(true);
                         item.MarkSucceededTable(tableResult);
                     }
                     else
                     {
-                        var result = await _ocrService.RecognizeAsync(item.FilePath, token);
+                        var result = await _ocrService!.RecognizeAsync(item.FilePath, token)
+                            .ConfigureAwait(true);
                         item.MarkSucceeded(result);
                     }
 
@@ -810,7 +837,8 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
         }
         catch (OperationCanceledException)
         {
-            StatusMessage = "已取消";
+            if (generation == _recognizeGeneration)
+                StatusMessage = "已取消";
         }
         catch (Exception ex)
         {
@@ -819,11 +847,15 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
         }
         finally
         {
-            IsBusy = false;
-            IsBatchRunning = false;
-            UpdateQueueSummary();
-            CanExportExcel = SelectedQueueItem?.TableResult != null;
-            RefreshCommands();
+            // Only the latest generation may clear busy — avoids racing a new run.
+            if (generation == _recognizeGeneration)
+            {
+                IsBusy = false;
+                IsBatchRunning = false;
+                UpdateQueueSummary();
+                CanExportExcel = SelectedQueueItem?.TableResult != null;
+                RefreshCommands();
+            }
         }
     }
 
@@ -960,11 +992,30 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
 
         try
         {
-            TableExcelExporter.Export(
+            var ocrLines = item.TableResult.OcrLines
+                .Select(l => l.Text)
+                .ToList();
+            var stats = TableExcelExporter.Export(
                 dialog.FileName,
                 item.TableResult.LogicPoints,
-                item.TableResult.CellTexts);
-            StatusMessage = $"已导出 Excel: {Path.GetFileName(dialog.FileName)}";
+                item.TableResult.CellTexts,
+                item.TableResult.Html,
+                ocrLines);
+
+            StatusMessage =
+                $"已导出 Excel: {Path.GetFileName(dialog.FileName)} " +
+                $"(模式={stats.Mode}, 表格单元格={stats.TableFilledCells}, OCR行={stats.OcrLineCount}, {stats.FileBytes}字节)";
+
+            if (stats.TableFilledCells <= 0 && stats.OcrLineCount > 0)
+            {
+                MessageBox.Show(
+                    "表格结构匹配未写入 Sheet1，已将 OCR 原文写入工作表「OCR原文」。\n" +
+                    "请打开该工作表查看内容。\n" +
+                    $"导出模式={stats.Mode}",
+                    "导出提示",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            }
 
             var owner = Application.Current?.MainWindow;
             var resultDialog = new ExportResultWindow(dialog.FileName);
@@ -1008,14 +1059,25 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
         NeedsDownload = false;
         DownloadProgress = 0;
         DownloadStatus = "";
-        IsBusy = false;
-        IsBatchRunning = false;
 
         foreach (var item in QueueItems.Where(i => i.Status == QueueItemStatus.Running))
         {
             item.Status = QueueItemStatus.Pending;
             item.StatusText = "等待";
         }
+
+        // Recognition cancel is cooperative: current ONNX Run must finish before
+        // engines are free. Keep IsBusy so the user cannot start a second Run
+        // concurrently (that crashes native ORT). RecognizeCoreAsync finally clears it.
+        if (IsBatchRunning || _recognizeTask is { IsCompleted: false })
+        {
+            StatusMessage = "正在停止...";
+            RefreshCommands();
+            return;
+        }
+
+        IsBusy = false;
+        IsBatchRunning = false;
 
         if (_ocrService != null)
         {
@@ -1164,8 +1226,15 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         _loadModelCts?.Cancel();
-        _loadModelCts?.Dispose();
         _recognizeCts?.Cancel();
+
+        if (_recognizeTask != null)
+        {
+            try { await _recognizeTask.ConfigureAwait(false); }
+            catch { /* ignore */ }
+        }
+
+        _loadModelCts?.Dispose();
         _recognizeCts?.Dispose();
 
         _tableService?.Dispose();
@@ -1175,8 +1244,6 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
             _ownedOcrService.Dispose();
         else if (_ocrService != null)
             _ocrService.Dispose();
-
-        await Task.CompletedTask;
     }
 }
 

@@ -146,7 +146,10 @@ internal sealed class TableLabelDecode
         if (_slanetPlus)
             RescaleCellBboxes(oriImg, cellBboxes);
 
-        return FilterBlankBbox(cellBboxes);
+        // Keep blank (all-zero) placeholders so cell index stays aligned with
+        // structure <td> order / LogicPoints / ExtractCellTexts. Filtering them
+        // shifts match keys and can leave Excel cells empty or scrambled.
+        return cellBboxes;
     }
 
     private static void RescaleCellBboxes(Mat img, float[][] cellBboxes)
@@ -165,13 +168,6 @@ internal sealed class TableLabelDecode
             for (var i = 1; i < bbox.Length; i += 2)
                 bbox[i] *= hRatio;
         }
-    }
-
-    private static float[][] FilterBlankBbox(float[][] cellBboxes)
-    {
-        return cellBboxes
-            .Where(b => b.Any(v => v != 0f))
-            .ToArray();
     }
 
     private static List<string> AddSpecialChar(List<string> dictCharacter)

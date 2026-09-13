@@ -9,6 +9,7 @@
 // <wechat>公众号：程序员Linc</wechat>
 //-----------------------------------------------------------------------
 using OnnxOcr.App.Models;
+using OnnxOcr.Core;
 using OnnxOcr.Core.Configuration;
 using OnnxOcr.Core.Pipeline;
 using OnnxOcr.Core.Table;
@@ -68,7 +69,13 @@ public sealed class TableOcrService : IDisposable
             var ocr = _textSystem.Run(image);
 
             cancellationToken.ThrowIfCancellationRequested();
+            OcrLogger.Log($"[TableOcr] structure start | ocrLines={ocr.Lines.Count}, image={image.Cols}x{image.Rows}");
             var table = _tableRecognizer.Recognize(image, ocr.Lines);
+            var filled = table.CellTexts.Count(t => !string.IsNullOrWhiteSpace(t));
+            OcrLogger.Log(
+                $"[TableOcr] structure done | score={table.StructureScore:F4}, " +
+                $"logic={table.LogicPoints.Count}, cells={table.CellTexts.Count}, filled={filled}, " +
+                $"htmlLen={table.Html?.Length ?? 0}, elapsed={table.Elapsed.TotalMilliseconds:F0}ms");
 
             return TableRunResult.From(table, ocr, imagePath, DateTime.UtcNow - started);
         }, cancellationToken);
