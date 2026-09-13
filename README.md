@@ -1,6 +1,6 @@
 # OnnxOCRSharp
 
-OnnxOCR 的 C# 移植版——使用 ONNX Runtime + OpenCvSharp 实现的纯 .NET OCR 方案，支持 PP-OCRv6 系列模型。官方桌面客户端为 **LincOCR**（社区版：单张文字/表格识别，表格可导出 Excel）。
+OnnxOCR 的 C# 移植版——使用 ONNX Runtime + OpenCvSharp 实现的纯 .NET OCR 方案，支持 PP-OCRv6 系列模型。官方桌面客户端名称为 **LincOCR**，项目名称为 **OnnxOCRSharp**。
 
 ## 项目来源
 
